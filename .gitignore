@@ -1,0 +1,11 @@
+*.py[co]
+*~
+.ipynb_checkpoints/
+# created by installing scikit-learn from git
+src/*
+build/
+dist/
+*.egg-info/
+.idea/
+*.c
+*.so
