@@ -1,0 +1,9 @@
+dependencies:
+  override:
+    - pip install mkdocs:
+        timeout: 1024
+
+test:
+  override:
+    - mkdocs new $(pwd):
+        timeout: 1024
