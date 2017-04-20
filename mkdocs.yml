@@ -1,0 +1,7 @@
+site_name: Scikit-garden
+site_description: 'Documentation for scikit-garden'
+pages:
+  - Home: index.md
+  - Trees: trees/about.md
+  - Ensembles: ensembles/about.md
+theme: readthedocs
