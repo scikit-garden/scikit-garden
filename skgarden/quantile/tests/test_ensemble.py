@@ -6,10 +6,10 @@ from sklearn.utils.testing import assert_array_equal
 from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.utils.testing import assert_true
 
-from quantile_forest.ensemble import RandomForestQuantileRegressor
-from quantile_forest.ensemble import ExtraTreesQuantileRegressor
-from quantile_forest.tree import DecisionTreeQuantileRegressor
-from quantile_forest.tree import ExtraTreeQuantileRegressor
+from skgarden.quantile import RandomForestQuantileRegressor
+from skgarden.quantile import ExtraTreesQuantileRegressor
+from skgarden.quantile import DecisionTreeQuantileRegressor
+from skgarden.quantile import ExtraTreeQuantileRegressor
 
 boston = load_boston()
 X, y = boston.data, boston.target

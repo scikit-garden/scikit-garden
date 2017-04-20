@@ -1,5 +1,5 @@
 import numpy as np
-from quantile_forest.utils import weighted_percentile
+from skgarden.quantile.utils import weighted_percentile
 
 from sklearn.utils.testing import assert_equal
 from sklearn.utils.testing import assert_array_almost_equal

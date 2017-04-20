@@ -13,7 +13,7 @@ from sklearn.utils.testing import assert_false
 from sklearn.utils.testing import assert_true
 from sklearn.utils.testing import assert_greater
 
-from mondrian_forest import MondrianForestRegressor
+from skgarden.mondrian import MondrianForestRegressor
 
 boston = load_boston()
 # The time of split and feature chosen for splitting are highly

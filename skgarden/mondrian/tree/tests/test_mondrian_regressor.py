@@ -12,7 +12,7 @@ from sklearn.utils.testing import assert_almost_equal
 from sklearn.utils.testing import assert_less
 from sklearn.utils.testing import assert_false
 
-from mondrian_forest import MondrianTreeRegressor
+from skgarden.mondrian import MondrianTreeRegressor
 
 
 def test_tree_predict():

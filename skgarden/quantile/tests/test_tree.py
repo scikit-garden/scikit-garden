@@ -3,9 +3,9 @@ from sklearn.datasets import load_boston
 from sklearn.model_selection import train_test_split
 from sklearn.utils.testing import assert_array_almost_equal
 
-from quantile_forest.tree import DecisionTreeQuantileRegressor
-from quantile_forest.tree import ExtraTreeQuantileRegressor
-from quantile_forest.utils import weighted_percentile
+from skgarden.quantile import DecisionTreeQuantileRegressor
+from skgarden.quantile import ExtraTreeQuantileRegressor
+from skgarden.quantile.utils import weighted_percentile
 
 boston = load_boston()
 X, y = boston.data, boston.target
