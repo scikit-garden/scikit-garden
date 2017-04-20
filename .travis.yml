@@ -11,7 +11,7 @@ env:
   matrix:
     - DISTRIB="conda" PYTHON_VERSION="3.5" COVERAGE="true"
 
-install: source build_tools/install.sh
+install: source build_tools/travis/install.sh
 
 script:
   nosetests
