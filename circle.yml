@@ -6,3 +6,9 @@ test:
   override:
     - mkdocs build:
         timeout: 1024
+
+deployment:
+ push:
+   branch: master
+   commands:
+     - bash ./build_tools/circle/deploy.sh
