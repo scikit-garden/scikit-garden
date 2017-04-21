@@ -28,4 +28,4 @@ and then you can do
 
 from anywhere outside the root directory.
 
-### Available models
+### Available models.
