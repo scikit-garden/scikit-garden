@@ -11,7 +11,7 @@ MSG="Pushing the docs for revision for branch: $CIRCLE_BRANCH, commit $CIRCLE_SH
 # Copy generated html by mkdocs to github pages
 echo "Copying built files"
 git clone -b master "git@github.com:scikit-garden/scikit-garden.github.io" deploy
-cp -r ${HOME}/site/* deploy
+cp -r ${HOME}/scikit-garden/site/* deploy
 
 # Move into deployment directory
 cd deploy
