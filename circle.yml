@@ -4,7 +4,7 @@ dependencies:
         timeout: 1024
 test:
   override:
-    - mkdocs build:
+    - bash ./build_tools/circle/build.sh
         timeout: 1024
 
 deployment:
