@@ -25,7 +25,8 @@ popd
 
 # Configure the conda environment and put it in the path using the
 # provided versions
-conda create -n testenv --yes pip nose numpy scipy cython scikit-learn
+conda create -n testenv --yes pip nose numpy scipy cython scikit-learn six
+pip install mkdocs
 source activate testenv
 
 python --version
