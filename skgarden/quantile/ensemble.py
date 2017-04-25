@@ -110,7 +110,7 @@ class BaseForestQuantileRegressor(ForestRegressor):
             ``dtype=np.float32`` and if a sparse matrix is provided
             to a sparse ``csr_matrix``.
 
-        quantile: int, optional
+        quantile : int, optional
             Value ranging from 0 to 100. By default, the mean is returned.
 
         check_input : boolean, (default=True)
@@ -257,15 +257,15 @@ class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
     oob_prediction_ : array of shape = [n_samples]
         Prediction computed with out-of-bag estimate on the training set.
 
-    y_train_: array-like, shape=(n_samples,)
+    y_train_ : array-like, shape=(n_samples,)
         Cache the target values at fit time.
 
-    y_weights_: array-like, shape=(n_estimators, n_samples)
+    y_weights_ : array-like, shape=(n_estimators, n_samples)
         y_weights_[i, j] is the weight given to sample ``j` while
         estimator ``i`` is fit. If bootstrap is set to True, this
         reduces to a 2-D array of ones.
 
-    y_train_leaves_: array-like, shape=(n_estimators, n_samples)
+    y_train_leaves_ : array-like, shape=(n_estimators, n_samples)
         y_train_leaves_[i, j] provides the leaf node that y_train_[i]
         ends up when estimator j is fit. If y_train_[i] is given
         a weight of zero when estimator j is fit, then the value is -1.
@@ -426,15 +426,15 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
     oob_prediction_ : array of shape = [n_samples]
         Prediction computed with out-of-bag estimate on the training set.
 
-    y_train_: array-like, shape=(n_samples,)
+    y_train_ : array-like, shape=(n_samples,)
         Cache the target values at fit time.
 
-    y_weights_: array-like, shape=(n_estimators, n_samples)
+    y_weights_ : array-like, shape=(n_estimators, n_samples)
         y_weights_[i, j] is the weight given to sample ``j` while
         estimator ``i`` is fit. If bootstrap is set to True, this
         reduces to a 2-D array of ones.
 
-    y_train_leaves_: array-like, shape=(n_estimators, n_samples)
+    y_train_leaves_ : array-like, shape=(n_estimators, n_samples)
         y_train_leaves_[i, j] provides the leaf node that y_train_[i]
         ends up when estimator j is fit. If y_train_[i] is given
         a weight of zero when estimator j is fit, then the value is -1.

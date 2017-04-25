@@ -20,7 +20,7 @@ class BaseTreeQuantileRegressor(BaseDecisionTree):
             ``dtype=np.float32`` and if a sparse matrix is provided
             to a sparse ``csr_matrix``.
 
-        quantile: int, optional
+        quantile : int, optional
             Value ranging from 0 to 100. By default, the mean is returned.
 
         check_input : boolean, (default=True)
@@ -201,10 +201,10 @@ class DecisionTreeQuantileRegressor(DecisionTreeRegressor, BaseTreeQuantileRegre
     tree_ : Tree object
         The underlying Tree object.
 
-    y_train_: array-like
+    y_train_ : array-like
         Train target values.
 
-    y_train_leaves_: array-like.
+    y_train_leaves_ : array-like.
         Cache the leaf nodes that each training sample falls into.
         y_train_leaves_[i] is the leaf that y_train[i] ends up at.
     """

@@ -19,15 +19,15 @@ class MondrianForestRegressor(ForestRegressor):
     n_estimators : integer, optional (default=10)
         The number of trees in the forest.
 
-    max_depth: integer, optional (default=None)
+    max_depth : integer, optional (default=None)
         The depth to which each tree is grown. If None, the tree is either
         grown to full depth or is constrained by `min_samples_split`.
 
-    min_samples_split: integer, optional (default=2)
+    min_samples_split : integer, optional (default=2)
         Stop growing the tree if all the nodes have lesser than
         `min_samples_split` number of samples.
 
-    bootstrap: boolean, optional (default=False)
+    bootstrap : boolean, optional (default=False)
         If bootstrap is set to False, then all trees are trained on the
         entire training dataset. Else, each tree is fit on n_samples
         drawn with replacement from the training dataset.
@@ -61,6 +61,7 @@ class MondrianForestRegressor(ForestRegressor):
 
     def fit(self, X, y):
         """Builds a forest of trees from the training set (X, y).
+
         Parameters
         ----------
         X : array-like or sparse matrix of shape = [n_samples, n_features]
@@ -76,6 +77,7 @@ class MondrianForestRegressor(ForestRegressor):
             ignored while searching for a split in each node. In the case of
             classification, splits are also ignored if they would result in any
             single class carrying a negative weight in either child node.
+
         Returns
         -------
         self : object
@@ -101,18 +103,18 @@ class MondrianForestRegressor(ForestRegressor):
 
         Parameters
         ----------
-        X: array-like, shape = (n_samples, n_features)
+        X : array-like, shape = (n_samples, n_features)
             Input samples.
 
-        return_std: boolean, default (False)
+        return_std : boolean, default (False)
             Whether or not to return the standard deviation.
 
         Returns
         -------
-        y: array-like, shape = (n_samples,)
+        y : array-like, shape = (n_samples,)
             Predictions at X.
 
-        std: array-like, shape = (n_samples,)
+        std : array-like, shape = (n_samples,)
             Standard deviation at X.
         """
         X = check_array(X)
@@ -148,16 +150,16 @@ class MondrianForestRegressor(ForestRegressor):
 
         Parameters
         ----------
-        X: array-like, shape = (n_samples, n_features)
+        X : array-like, shape = (n_samples, n_features)
             Input.
 
         Returns
         -------
-        decision_path: sparse csr matrix, shape = (n_samples, n_total_nodes)
+        decision_path : sparse csr matrix, shape = (n_samples, n_total_nodes)
             Return a node indicator matrix where non zero elements
             indicate the weight of that particular node in making predictions.
 
-        est_inds: array-like, shape = (n_estimators + 1,)
+        est_inds : array-like, shape = (n_estimators + 1,)
             weighted_decision_path[:, est_inds[i]: est_inds[i + 1]]
             provides the weighted_decision_path of estimator i
         """
