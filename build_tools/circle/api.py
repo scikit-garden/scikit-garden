@@ -13,6 +13,7 @@ Shamelessly copied verbatim from https://github.com/kwikteam/phy/blob/master/too
 
 import inspect
 import os.path as op
+import os
 import re
 import sys
 
@@ -322,6 +323,5 @@ if __name__ == '__main__':
         'quantile']
 
     curdir = op.dirname(op.realpath(__file__))
-    path = op.join(curdir, '../../docs/api.md')
-    print(path)
+    path = op.join(os.getcwd(), 'docs/api.md')
     generate_api_doc(package, subpackages, path=path)

@@ -1,6 +1,6 @@
 dependencies:
   override:
-    - pip install mkdocs:
+    - bash ./build_tools/circle/install.sh:
         timeout: 1024
 test:
   override:
