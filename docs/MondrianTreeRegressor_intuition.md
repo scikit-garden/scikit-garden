@@ -1,5 +1,5 @@
 
-This example provides an intuition behind the MondrianTreeRegressor. In particular, the key differences between an extremely randomized tree, and explanations of the tree construction and prediction will be higlighted.
+This example provides an intuition behind the MondrianTreeRegressor. In particular, the key differences between an extremely randomized tree and explanations of the tree construction and prediction will be higlighted.
 
 
 ```python
@@ -14,7 +14,7 @@ from itertools import cycle
 
 ##  Extremely Randomized Tree - Recap
 
-In every tree-based algorithm algorithm, the decision rule at every node is constructed by considering a set of candidate split points and that candidate split point that minimizes a certain impurity (generally the mse in case of continuous values) is chosen. In an extremely randomized tree, the number of candidate splits `S` are limited to `n_features` and each candidate split `S[i]` is drawn unifomly from the bounds `(l_f[i], u_f[i])`.
+In every tree-based algorithm, the decision rule at every node is constructed by considering a set of candidate split points and that candidate split point that minimizes a certain impurity (generally the mse in case of continuous values) is chosen. In an extremely randomized tree, the number of candidate splits `S` are limited to `n_features` and each candidate split `S[i]` is drawn unifomly from the bounds `(l_f[i], u_f[i])`.
 
 In a single extremely randomized tree, this construction might seem suboptimal but while constructing an ensemble of trees, it makes sure that each tree constructed in an independent fashion. And also limiting the number of candidate split points makes the tree construction very fast. Let us now generate some toy data.
 
