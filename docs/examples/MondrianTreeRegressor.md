@@ -15,9 +15,9 @@ from itertools import cycle
 
 ##  Extremely Randomized Tree - Recap
 
-In every tree-based algorithm, the decision rule at every node is constructed by considering a set of candidate split points and that candidate split point that minimizes a certain impurity (generally the mse in case of continuous values) is chosen. In an extremely randomized tree, the number of candidate splits `S` are limited to `n_features` and each candidate split `S[i]` is drawn unifomly from the bounds `(l_f[i], u_f[i])`.
+In a tree-based algorithm, the decision rule at every node is constructed by considering a set of candidate split points and that candidate split point that minimizes a certain impurity (generally the mse in case of continuous values) is chosen. In an extremely randomized tree, the number of candidate splits `S` are limited to `n_features` and each candidate split `S[i]` is drawn unifomly from the bounds `(l_f[i], u_f[i])`.
 
-In a single extremely randomized tree, this construction might seem suboptimal but while constructing an ensemble of trees, it makes sure that each tree constructed in an independent fashion. And also limiting the number of candidate split points makes the tree construction very fast. Let us now generate some toy data.
+In a single extremely randomized tree, this construction might seem suboptimal but while constructing an ensemble of trees, it makes sure that each tree constructed in an independent fashion. In addition, limiting the number of candidate split points makes the tree construction very fast. Let us now generate some toy data.
 
 
 ```python
@@ -34,12 +34,12 @@ plt.show()
 ```
 
 
-![png](mondrian_tree/plot1.png)
+![png](../mondrian_tree/plot1.png)
 
 
 ## Plotting decision boundaries using ERT's
 
-Let us now scikit-learn's ExtraTreeRegressor to predict on unseen data and to plot decision boundaries. Also, we set the `max_depth` parameter to 2, which means there can be a maximum of 4 decision boundaries in the 1-D space.
+Let us now scikit-learn's ExtraTreeRegressor to train on the generated toy data, predict on some unseen data and plot decision boundaries in the 1-D space. Also, we set the `max_depth` parameter to 2, which means there can be a maximum of 4 decision boundaries in the 1-D space.
 
 
 ```python
@@ -65,11 +65,9 @@ plot_1D_decision_boundaries(etr, plt)
 plt.show()
 ```
 
+![png](../mondrian_tree/plot2.png)
 
-![png](mondrian_tree/plot2.png)
-
-
-The blue line represents the prediction in every region of the decision space.
+The blue line represents the mean prediction in every region of the decision space.
 
 We notice that as we move away from the training data
 
@@ -85,49 +83,50 @@ Ideally, as move away from the training data we are unsure about the target valu
 At every node, the split threshold and feature is decided independently of the target or the decrease in impurity! Yes, that is right.
 
 1. The split feature index `f` is drawn with a probability proportional to `u_b[f] - l_b[f]` where `u_b` and `l_b` and the upper and lower bounds of all the features.
-2. After fixing the feature index, the split threshold  $\delta$ is then drawn from a uniform distribution with limits `l_b`, `u_b`.
+2. After fixing the feature index, the split threshold \(\delta\) is then drawn from a uniform distribution with limits `l_b`, `u_b`.
 
 The intuition being that a feature that has a huge difference between the bounds is likelier to be an "important" feature.
 
 At every node, in a decision tree, the mean and impurity are stored (or class probabilities in case of classification). In addition to this, every node `j` in a mondrian tree tracks two other things.
 
 1. The upper and lower bounds of all the features in that particular node.
-2. The time of split, which is drawn from an exponential with mean $\sum_{f=1}^D(u_b[f] - l_b[f])$.
+2. The time of split, which is drawn from an exponential with mean \(\sum_{f=1}^D(u_b[f] - l_b[f])\)
 
-If you stare at the equation for half a minute, that makes sense as well because the larger the bounding box of a node, the time of split is smaller. Also the above property sets the time of split of leaves to infinity. Once the split feature and threshold are decided, then the tree construction happens in a similar way to that of a decision tree, a node splits the training data into two parts, $X[:, f] < \delta$ to one leaf and $X[:, f] > \delta$ to the other.    `
+If you stare at the equation for half a minute, that makes sense as well because the larger the bounding box of a node, the time of split is smaller. Also the above property sets the time of split of leaves to infinity. Once the split feature and threshold are decided, then the tree construction happens in a similar way to that of a decision tree, a node splits the training data into two parts, \(X[:, f] < \delta\) to one leaf and \(X[:, f] > \delta\) to the other.
 
 ###  Prediction time
 
 Recall that for a decision tree, for a new training point, computing the predictive mean and variance is fairly straightforward. That is, find the leaf node that a new training point lands in and output the mean and variance of the node.
 
-The prediction step of a Mondrian Tree is a bit more complicated. It takes into account all the nodes in the path of a new point from the root to the leaf for making a prediction. Mathematically, the distribution of $P(Y | X)$ is given by
+The prediction step of a Mondrian Tree is a bit more complicated. It takes into account all the nodes in the path of a new point from the root to the leaf for making a prediction. Mathematically, the distribution of
+\(P(Y | X)\) is given by
 
-$P(Y | X) = \sum_{j} w_j \mathcal{N} (m_j, v_j)$
+\(P(Y | X) = \sum_{j} w_j \mathcal{N} (m_j, v_j)\)
 
 where the summation is across all the nodes in the path from the root to the leaf.
 
-To compute the weights given to each node, we need to compute the probability of separation $p_j(x)$ in each node. This is computed in the following way.
+To compute the weights given to each node, we need to compute the probability of separation \(p_j(x)\) of each node. This is computed in the following way.
 
-1. $\Delta_{j} = \tau_{j} - \tau_{parent(j)}$
-2. $\eta_{j}(x) = \sum_{f}(\max(x[f] - u_{bj}[f], 0) + \max(0, l_{bj}[f] - x[f]))$
-3. $p_j(x) = 1 - \exp(-\Delta_{j} \eta_{j}(x))$
+1. \(\Delta_{j} = \tau_{j} - \tau_{parent(j)}\)
+2. \(\eta_{j}(x) = \sum_{f}(\max(x[f] - u_{bj}[f], 0) + \max(0, l_{bj}[f] - x[f]))\)
+3. \(p_j(x) = 1 - e^{-\Delta_{j} \eta_{j}(x))}\)
 
 And then the weights are given by:
 
-If j is not a leaf:
+If `j` is not a leaf:
 
-$w_j(x) = p_j(x) \prod_{k \in anc(j)} (1 - p_k(x))$
+\(w_j(x) = p_j(x) \prod_{k \in anc(j)} (1 - p_k(x))\)
 
 If j is a leaf:
 
-$w_j(x) = 1 - \sum_{k \in anc(j)} p_k(x)$
+\(w_j(x) = 1 - \sum_{k \in anc(j)} w_k(x)\)
 
 Let us take a more than half a minute to stare at these equations and understand what they mean.
 
-1. $p_j(x)$ is high when $\eta_{j}(x)$ is high. As $\eta_{j}$ approaches infinity, $p_j(x)$ approaches zero. This means that when the point is far away from the bounding box of the node, the probability of separation becomes high.
-2. $p_j(x)$ is high when $\Delta{j}$ is high. This means when the bounding box of a node is small as compared to the bounding box of its parent, the probability of separation becomes high.
-3. The weight given to each node, $w_j$ can be decomposed into two factors, $p_j$ and $\prod_{k \in anc(j)} (1 - p_k(x))$. The product term can be understood as the probability of that point not being separated till that particular node is reached. So the node where a new point just starts to branch of is given the highest weight.
-4. For a point in the training data, $p_j(x)$ becomes zero all nodes (and hence $w_j(x)$). The leaf then has a weightage of 1.0 and this reduces to a standard decision tree prediction.
+1. \(p_j(x)\) is high when \(\eta_{j}(x)\) is high. As \(\eta_{j}(x)\) approaches infinity, \(p_j(x)\) approaches zero. This means that when the point is far away from the bounding box of the node, the probability of separation becomes high.
+2. \(p_j(x)\) is high when \(\Delta{j}\) is high. This means when the bounding box of a node is small as compared to the bounding box of its parent, the probability of separation becomes high.
+3. The weight given to each node, \(w_j\) can be decomposed into two factors, \(p_j\) and \(\prod_{k \in anc(j)} (1 - p_k(x))\). The product term can be understood as the probability of that point not being separated till that particular node is reached. So the node where a new point just starts to branch of is given the highest weight.
+4. For a point in the training data, \(p_j(x)\) becomes zero all nodes (and hence \(w_j(x)\)). The leaf then has a weightage of 1.0 and this reduces to a standard decision tree prediction.
 
 ## Plotting decision boundaries (and more) using MondrianTrees
 
@@ -237,7 +236,7 @@ plot_bounds_with_decision_boundaries(
 ```
 
 
-![png](mondrian_tree/plot3.png)
+![png](../mondrian_tree/plot3.png)
 
 
 ### Interpretation
@@ -262,7 +261,7 @@ Let us look at the plots from top to bottom.
 
 ###  Predictive mean and variance
 
-Writing $P(Y | X)$ as a GMM model, enables us to derive the mean and variance quite easily. Here is a plot showing the predictive mean and variance.
+Writing \(P(Y | X)\) as a GMM model, enables us to derive the mean and variance quite easily. Here is a plot showing the predictive mean and variance.
 
 
 ```python
@@ -271,8 +270,4 @@ plt.plot(X_test, y_pred)
 plt.fill_between(X_test.ravel(), y_pred + 1.96*y_std, y_pred - 1.96*y_std, alpha=0.2)
 ```
 
-
-
-
-
-![png](mondrian_tree/plot4.png)
+![png](../mondrian_tree/plot4.png)
