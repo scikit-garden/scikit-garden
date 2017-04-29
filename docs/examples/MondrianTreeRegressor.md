@@ -1,3 +1,4 @@
+# Intuition behind MondrianTrees
 
 This example provides an intuition behind the MondrianTreeRegressor. In particular, the key differences between an extremely randomized tree and explanations of the tree construction and prediction will be higlighted.
 
