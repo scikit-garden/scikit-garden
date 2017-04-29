@@ -92,14 +92,13 @@ class MondrianForestRegressor(ForestRegressor):
         Returns the predicted mean and std.
 
         The prediction is a GMM drawn from
-        \sum_{i=1}^T w_i N(m_i, \sigma_i) where w_i = 1 / T.
+        \(\sum_{i=1}^T w_i N(m_i, \sigma_i)\) where \(w_i = {1 \over T}\).
 
-        The mean E[Y | X] reduces to 1 / T * \sum_{i=1}^T m_i
+        The mean \(E[Y | X]\) reduces to \({\sum_{i=1}^T m_i \over T}\)
 
-        The variance Var[Y | X] is given by
-            = E[Y**2 | X] - E[Y | X]**2
-            = (1 / T) * \sum_{i=1}^T E[Y**2_i| X] - E[Y| X]**2
-            = (1 / T) * \sum_{i=1}^T (Var[Y_i | X] + E[Y_i | X]**2) - E[Y| X]**2
+        The variance \(Var[Y | X]\) is given by $$Var[Y | X] = E[Y^2 | X] - E[Y | X]^2$$
+        $$=\\frac{\sum_{i=1}^T E[Y^2_i| X]}{T} - E[Y | X]^2$$
+        $$= \\frac{\sum_{i=1}^T (Var[Y_i | X] + E[Y_i | X]^2)}{T} - E[Y| X]^2$$
 
         Parameters
         ----------
