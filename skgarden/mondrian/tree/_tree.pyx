@@ -246,8 +246,7 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
                                          weighted_n_node_samples,
                                          splitter.lower_bounds,
                                          splitter.upper_bounds,
-                                         split.E,
-                                         mean)
+                                         split.E)
 
                 if node_id == <SIZE_t>(-1):
                     rc = -1
@@ -385,7 +384,7 @@ cdef class Tree:
 
     property mean:
         def __get__(self):
-            return self._get_node_ndarray()["mean"][:self.node_count]
+            return self._get_value_ndarray()[:self.node_count].ravel()
 
     property variance:
         def __get__(self):
@@ -518,7 +517,7 @@ cdef class Tree:
                           double weighted_n_node_samples,
                           DTYPE_t* lower_bounds,
                           DTYPE_t* upper_bounds,
-                          double E, DOUBLE_t mean) nogil except -1:
+                          double E) nogil except -1:
         """Add a node to the tree.
 
         The new node registers itself as the child of its parent.
@@ -553,7 +552,6 @@ cdef class Tree:
         node.upper_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
         memcpy(node.lower_bounds, lower_bounds, self.n_features*sizeof(DTYPE_t))
         memcpy(node.upper_bounds, upper_bounds, self.n_features*sizeof(DTYPE_t))
-        node.mean = mean
         node.variance = impurity
 
         if is_leaf:
@@ -595,6 +593,9 @@ cdef class Tree:
         cdef SIZE_t n_features = X.shape[1]
         cdef SIZE_t f_ind
 
+        # We currently support only multi-output y.
+        cdef np.ndarray[DOUBLE_t, ndim=1] node_means = np.ravel(self._get_value_ndarray())
+
         # Initialize output
         cdef np.ndarray[DTYPE_t, ndim=1] mean = np.zeros(n_samples, dtype=DTYPE)
         cdef np.ndarray[DTYPE_t, ndim=1] std = np.zeros(n_samples, dtype=DTYPE)
@@ -602,6 +603,8 @@ cdef class Tree:
         # Initialize auxiliary data-structure
         cdef Node* node = NULL
         cdef SIZE_t i = 0
+        cdef SIZE_t j
+        cdef SIZE_t node_id = 0
         cdef DOUBLE_t Delta = 0.0
         cdef DOUBLE_t parent_tau
         cdef DOUBLE_t p_js
@@ -617,9 +620,10 @@ cdef class Tree:
                 # Step 3
                 parent_tau = 0.0
                 p_nsy = 1.0
-                node = self.nodes
+                node_id = 0
 
                 while True:
+                    node = &self.nodes[node_id]
 
                     # Step 5: First part.
                     # Calculate Delta
@@ -643,10 +647,10 @@ cdef class Tree:
                         p_js = 1 - exp(-Delta * eta)
                         w_j = p_nsy * p_js
 
-                    mean[i] += w_j * node.mean
+                    mean[i] += w_j * node_means[node_id]
 
                     if return_std:
-                        std[i] += w_j * (node.mean**2 + node.variance)
+                        std[i] += w_j * (node_means[node_id]**2 + node.variance)
 
                     if node.left_child == _TREE_LEAF:
                         break
@@ -655,9 +659,9 @@ cdef class Tree:
                     # Step 12-14
                     if X_ptr[X_sample_stride * i +
                              X_fx_stride * node.feature] <= node.threshold:
-                        node = &self.nodes[node.left_child]
+                        node_id = node.left_child
                     else:
-                        node = &self.nodes[node.right_child]
+                        node_id = node.right_child
 
                 if return_std:
                     std[i] -= mean[i]**2
