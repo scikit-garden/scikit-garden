@@ -195,7 +195,6 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
         cdef bint first = 1
         cdef SIZE_t max_depth_seen = -1
         cdef int rc = 0
-        cdef DTYPE_t mean
 
         cdef Stack stack = Stack(INITIAL_STACK_SIZE)
         cdef StackRecord stack_record
@@ -240,7 +239,6 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
                 else:
                     splitter.set_bounds()
 
-                mean = splitter.criterion.sum_total[0] / weighted_n_node_samples
                 node_id = tree._add_node(parent, is_left, is_leaf, split.feature,
                                          split.threshold, impurity, n_node_samples,
                                          weighted_n_node_samples,
