@@ -56,6 +56,7 @@ __all__ = ["DecisionTreeClassifier",
 DTYPE = _tree.DTYPE
 DOUBLE = _tree.DOUBLE
 
+CRITERIA_CLF = {"classification": _criterion.ClassificationCriterion}
 CRITERIA_REG = {"mse": _criterion.MSE}
 
 SPLITTERS = {"mondrian": _splitter.MondrianSplitter}
@@ -293,7 +294,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
             else:
                 criterion = CRITERIA_REG[self.criterion](self.n_outputs_,
                                                          n_samples)
-
         splitter = self.splitter
         if not isinstance(self.splitter, Splitter):
             splitter = SPLITTERS[self.splitter](criterion,
@@ -305,7 +305,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
 
         self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
 
-        # Use BestFirst if max_leaf_nodes given; use DepthFirst otherwise
         builder = DepthFirstTreeBuilder(splitter, min_samples_split,
                                         min_samples_leaf,
                                         min_weight_leaf,
@@ -368,30 +367,18 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         """
         check_is_fitted(self, 'tree_')
         X = self._validate_X_predict(X, check_input)
-        n_samples = X.shape[0]
 
         # Classification
         if isinstance(self, ClassifierMixin):
-            proba = self.tree_.predict(X)
-            if self.n_outputs_ == 1:
-                return self.classes_.take(np.argmax(proba, axis=1), axis=0)
-
-            else:
-                predictions = np.zeros((n_samples, self.n_outputs_))
-
-                for k in range(self.n_outputs_):
-                    predictions[:, k] = self.classes_[k].take(
-                        np.argmax(proba[:, k], axis=1),
-                        axis=0)
-
-                return predictions
+            return self.classes_[self.predict_proba(X).argmax(axis=1)]
 
         # Regression
         else:
-            mean_std = self.tree_.predict(X, return_std=return_std)
+            mean_and_std = self.tree_.predict(
+                X, return_std=return_std, is_regression=True)
             if return_std:
-                return mean_std
-            return mean_std[0]
+                return mean_and_std
+            return mean_and_std[0]
 
     def apply(self, X, check_input=True):
         """
@@ -460,8 +447,8 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         check_is_fitted(self, 'tree_')
         return self.tree_.compute_feature_importances()
 
-class MondrianTreeRegressor(BaseDecisionTree, RegressorMixin):
-    """A Mondrian tree regressor.
+class BaseMondrianTree(BaseDecisionTree):
+    """A Mondrian tree.
 
     The splits in a mondrian tree regressor differ from the standard regression
     tree in the following ways.
@@ -506,57 +493,6 @@ class MondrianTreeRegressor(BaseDecisionTree, RegressorMixin):
         If None, the random number generator is the RandomState instance used
         by `np.random`.
     """
-    def __init__(self,
-                 max_depth=None,
-                 min_samples_split=2,
-                 random_state=None):
-        super(MondrianTreeRegressor, self).__init__(
-            criterion="mse",
-            splitter="mondrian",
-            max_depth=max_depth,
-            min_samples_split=min_samples_split,
-            min_samples_leaf=1,
-            min_weight_fraction_leaf=0.0,
-            max_features=None,
-            random_state=random_state,
-            max_leaf_nodes=None,
-            presort=False)
-
-    def fit(self, X, y, sample_weight=None, check_input=True, X_idx_sorted=None):
-        """Build a mondrian tree regressor from the training set (X, y).
-
-        Parameters
-        ----------
-        X : array-like or sparse matrix, shape = [n_samples, n_features]
-            The training input samples. Internally, it will be converted to
-            ``dtype=np.float32`` and if a sparse matrix is provided
-            to a sparse ``csc_matrix``.
-
-        y : array-like, shape = [n_samples] or [n_samples, n_outputs]
-            The target values (real numbers). Use ``dtype=np.float64`` and
-            ``order='C'`` for maximum efficiency.
-
-        check_input : boolean, (default=True)
-            Allow to bypass several input checking.
-            Don't use this parameter unless you know what you do.
-
-        X_idx_sorted : array-like, shape = [n_samples, n_features], optional
-            The indexes of the sorted training input samples. If many tree
-            are grown on the same dataset, this allows the ordering to be
-            cached between trees. If None, the data will be sorted here.
-            Don't use this parameter unless you know what to do.
-
-        Returns
-        -------
-        self : object
-            Returns self.
-        """
-        super(MondrianTreeRegressor, self).fit(
-            X, y,
-            sample_weight=None,
-            check_input=check_input,
-            X_idx_sorted=X_idx_sorted)
-        return self
 
     def weighted_decision_path(self, X, check_input=True):
         """
@@ -584,3 +520,63 @@ class MondrianTreeRegressor(BaseDecisionTree, RegressorMixin):
         """
         X = self._validate_X_predict(X, check_input)
         return self.tree_.weighted_decision_path(X)
+
+
+class MondrianTreeRegressor(BaseMondrianTree, RegressorMixin):
+    def __init__(self,
+                 max_depth=None,
+                 min_samples_split=2,
+                 random_state=None):
+        super(MondrianTreeRegressor, self).__init__(
+            criterion="mse",
+            splitter="mondrian",
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=1,
+            min_weight_fraction_leaf=0.0,
+            max_features=None,
+            random_state=random_state,
+            max_leaf_nodes=None,
+            presort=False)
+
+
+class MondrianTreeClassifier(BaseMondrianTree, ClassifierMixin):
+    def __init__(self,
+                 max_depth=None,
+                 min_samples_split=2,
+                 random_state=None):
+        super(MondrianTreeClassifier, self).__init__(
+            criterion="classification",
+            splitter="mondrian",
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=1,
+            min_weight_fraction_leaf=0.0,
+            max_features=None,
+            random_state=random_state,
+            max_leaf_nodes=None,
+            presort=False)
+
+    def predict_proba(self, X, check_input=True):
+        """
+        Predicts the probability of each class label given X.
+
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+            The input samples. Internally, it will be converted to
+            ``dtype=np.float32``.
+
+        check_input : boolean, (default=True)
+            Allow to bypass several input checking.
+            Don't use this parameter unless you know what you do.
+
+        Returns
+        -------
+        y_prob : array of shape = [n_samples, n_classes]
+            Prediceted probabilities for each class.
+        """
+        check_is_fitted(self, 'tree_')
+        X = self._validate_X_predict(X, check_input)
+
+        return self.tree_.predict(X, return_std=False, is_regression=False)[0]

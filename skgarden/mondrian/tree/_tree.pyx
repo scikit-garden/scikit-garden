@@ -566,8 +566,8 @@ cdef class Tree:
         else:
             return self._apply_dense(X)
 
-    cpdef tuple predict(self, object X, bint return_std):
-        """Predicts the regressor label and standard deviation for all samples."""
+    cpdef tuple predict(self, object X, bint return_std=False, bint is_regression=True):
+        """Predicts the regressor and standard deviation for all samples."""
 
         # Check input
         if not isinstance(X, np.ndarray):
@@ -586,12 +586,18 @@ cdef class Tree:
         cdef SIZE_t n_features = X.shape[1]
         cdef SIZE_t f_ind
 
-        # We currently support only multi-output y.
-        cdef np.ndarray[DOUBLE_t, ndim=1] node_means = np.ravel(self._get_value_ndarray())
+        # We currently support only single-output y.
+        # These node values are the means in case of regression.
+        # For classification these are the class counts.
+        cdef np.ndarray[DOUBLE_t, ndim=2] node_values = self._get_value_ndarray()[:, 0, :]
 
         # Initialize output
         cdef np.ndarray[DTYPE_t, ndim=1] mean = np.zeros(n_samples, dtype=DTYPE)
         cdef np.ndarray[DTYPE_t, ndim=1] std = np.zeros(n_samples, dtype=DTYPE)
+
+        cdef SIZE_t n_classes = node_values.shape[1]
+        cdef np.ndarray[DTYPE_t, ndim=2] proba = np.zeros((n_samples, n_classes), dtype=DTYPE)
+        cdef np.ndarray[SIZE_t, ndim=1] n_node_samples = self.n_node_samples
 
         # Initialize auxiliary data-structure
         cdef Node* node = NULL
@@ -607,6 +613,7 @@ cdef class Tree:
         # Algorithm 6.5
         cdef DOUBLE_t p_nsy
         cdef SIZE_t sample_ind
+        cdef SIZE_t class_ind
 
         with nogil:
             for i in range(n_samples):
@@ -640,10 +647,14 @@ cdef class Tree:
                         p_js = 1 - exp(-Delta * eta)
                         w_j = p_nsy * p_js
 
-                    mean[i] += w_j * node_means[node_id]
+                    if is_regression:
+                        mean[i] += w_j * node_values[node_id, 0]
+                    else:
+                        for class_ind in range(n_classes):
+                            proba[i, class_ind] += w_j * (node_values[node_id, class_ind] / n_node_samples[node_id])
 
                     if return_std:
-                        std[i] += w_j * (node_means[node_id]**2 + node.variance)
+                        std[i] += w_j * (node_values[node_id, 0]**2 + node.variance)
 
                     if node.left_child == _TREE_LEAF:
                         break
@@ -662,9 +673,12 @@ cdef class Tree:
                         std[i] = 0.0
                     std[i] = sqrt(std[i])
 
-        if return_std:
-            return mean, std
-        return mean,
+        if is_regression:
+            if return_std:
+                return mean, std
+            return mean,
+        else:
+            return proba,
 
 
     cdef inline np.ndarray _apply_dense(self, object X):

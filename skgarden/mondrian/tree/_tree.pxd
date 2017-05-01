@@ -73,7 +73,7 @@ cdef class Tree:
     cdef np.ndarray _get_value_ndarray(self)
     cdef np.ndarray _get_node_ndarray(self)
 
-    cpdef tuple predict(self, object X, bint return_std)
+    cpdef tuple predict(self, object X, bint return_std=*, bint is_regression=*)
 
     cpdef np.ndarray apply(self, object X)
     cdef np.ndarray _apply_dense(self, object X)
