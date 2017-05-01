@@ -66,7 +66,7 @@ cdef class Tree:
                           double weighted_n_samples,
                           DTYPE_t* lower_bounds,
                           DTYPE_t* upper_bounds,
-                          double E, DOUBLE_t mean) nogil except -1
+                          double E) nogil except -1
     cdef int _resize(self, SIZE_t capacity) nogil except -1
     cdef int _resize_c(self, SIZE_t capacity=*) nogil except -1
 
