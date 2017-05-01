@@ -58,7 +58,7 @@ DOUBLE = _tree.DOUBLE
 
 CRITERIA_REG = {"mse": _criterion.MSE}
 
-DENSE_SPLITTERS = {"mondrian": _splitter.MondrianSplitter}
+SPLITTERS = {"mondrian": _splitter.MondrianSplitter}
 
 # =============================================================================
 # Base decision tree
@@ -83,7 +83,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
                  max_features,
                  max_leaf_nodes,
                  random_state,
-                 min_impurity_split,
                  class_weight=None,
                  presort=False):
         self.criterion = criterion
@@ -95,7 +94,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         self.max_features = max_features
         self.random_state = random_state
         self.max_leaf_nodes = max_leaf_nodes
-        self.min_impurity_split = min_impurity_split
         self.class_weight = class_weight
         self.presort = presort
 
@@ -259,10 +257,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
             min_weight_leaf = (self.min_weight_fraction_leaf *
                                np.sum(sample_weight))
 
-        if self.min_impurity_split < 0.:
-            raise ValueError("min_impurity_split must be greater than "
-                             "or equal to 0")
-
         presort = self.presort
         # Allow presort to be 'auto', which means True if the dataset is dense,
         # otherwise it will be False.
@@ -300,8 +294,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
                 criterion = CRITERIA_REG[self.criterion](self.n_outputs_,
                                                          n_samples)
 
-        SPLITTERS = SPARSE_SPLITTERS if issparse(X) else DENSE_SPLITTERS
-
         splitter = self.splitter
         if not isinstance(self.splitter, Splitter):
             splitter = SPLITTERS[self.splitter](criterion,
@@ -317,7 +309,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         builder = DepthFirstTreeBuilder(splitter, min_samples_split,
                                         min_samples_leaf,
                                         min_weight_leaf,
-                                        max_depth, self.min_impurity_split)
+                                        max_depth)
         builder.build(self.tree_, X, y, sample_weight, X_idx_sorted)
 
         if self.n_outputs_ == 1:
@@ -528,7 +520,6 @@ class MondrianTreeRegressor(BaseDecisionTree, RegressorMixin):
             max_features=None,
             random_state=random_state,
             max_leaf_nodes=None,
-            min_impurity_split=1e-7,
             presort=False)
 
     def fit(self, X, y, sample_weight=None, check_input=True, X_idx_sorted=None):

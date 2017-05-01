@@ -158,8 +158,8 @@ def test_mean_std():
     # For points completely far away from the training data, this
     # should converge to the empirical mean and variance.
     # X is scaled between to -1.0 and 1.0
-    X_inf = np.vstack((20.0 * np.ones(X.shape[1]),
-                       -20.0 * np.ones(X.shape[1])))
+    X_inf = np.vstack((30.0 * np.ones(X.shape[1]),
+                       -30.0 * np.ones(X.shape[1])))
     inf_mean, inf_std = mr.predict(X_inf, return_std=True)
     assert_array_almost_equal(inf_mean, y.mean(), 1)
     assert_array_almost_equal(inf_std, y.std(), 2)
