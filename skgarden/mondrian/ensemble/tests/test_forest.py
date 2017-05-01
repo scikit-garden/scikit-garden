@@ -5,7 +5,6 @@ import numpy as np
 from sklearn.datasets import load_boston
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.utils import check_random_state
 from sklearn.utils.testing import assert_array_equal
 from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.utils.testing import assert_equal
@@ -21,6 +20,7 @@ boston = load_boston()
 scaler = MinMaxScaler()
 X, y = boston.data, boston.target
 X = scaler.fit_transform(X)
+
 
 def test_boston():
     mr = MondrianForestRegressor(n_estimators=5, random_state=0)
@@ -53,9 +53,9 @@ def test_pickle():
 
 def test_parallel_train():
     mr = MondrianForestRegressor(n_estimators=20, random_state=0, max_depth=4)
-    y_pred = (
-        [mr.set_params(n_jobs=n_jobs).fit(X, y).predict(X) for n_jobs in [1, 2, 4, 8]]
-    )
+    y_pred = ([mr.set_params(n_jobs=n_jobs).fit(X, y).predict(X)
+               for n_jobs in [1, 2, 4, 8]])
+
     for pred1, pred2 in zip(y_pred, y_pred[1:]):
         assert_array_equal(pred1, pred2)
 
@@ -101,7 +101,7 @@ def test_decision_path():
     mr = MondrianForestRegressor(random_state=0)
     mr.fit(X, y)
     indicator, col_inds = mr.decision_path(X)
-    indices, indptr, data = indicator.indices, indicator.indptr, indicator.data
+    indices, indptr = indicator.indices, indicator.indptr
 
     n_nodes = [est.tree_.node_count for est in mr.estimators_]
     assert_equal(indicator.shape[0], X.shape[0])
@@ -143,6 +143,7 @@ def test_weighted_decision_path():
     assert_array_almost_equal(
         np.ravel(mr.weighted_decision_path(X_test)[0].sum(axis=1)),
         mr.n_estimators * np.ones(X_test.shape[0]), 5)
+
 
 def test_mean_std():
     mr = MondrianForestRegressor(random_state=0)
