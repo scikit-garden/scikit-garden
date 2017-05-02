@@ -437,9 +437,5 @@ cdef class MondrianSplitter(BaseDenseSplitter):
                 samples[p] = tmp
 
         split.pos = p
-        self.criterion.reset()
-        self.criterion.update(split.pos)
-        self.criterion.children_impurity(&split.impurity_left,
-                                         &split.impurity_right)
         free(cum_diff)
         return 0
