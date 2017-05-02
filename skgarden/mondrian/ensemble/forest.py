@@ -7,6 +7,7 @@ from sklearn.utils.validation import check_X_y
 
 from ..tree import MondrianTreeRegressor
 
+
 class MondrianForestRegressor(ForestRegressor):
     """
     A MondrianForestRegressor is an ensemble of MondrianTrees.
@@ -65,8 +66,8 @@ class MondrianForestRegressor(ForestRegressor):
         Parameters
         ----------
         X : array-like or sparse matrix of shape = [n_samples, n_features]
-            The training input samples. Internally, its dtype will be converted to
-            ``dtype=np.float32``. If a sparse matrix is provided, it will be
+            The training input samples. Internally, its dtype will be converted
+            to ``dtype=np.float32``. If a sparse matrix is provided, it will be
             converted into a sparse ``csc_matrix``.
         y : array-like, shape = [n_samples] or [n_samples, n_outputs]
             The target values (class labels in classification, real numbers in
