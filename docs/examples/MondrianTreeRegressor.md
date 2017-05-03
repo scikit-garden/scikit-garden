@@ -1,10 +1,8 @@
 # Intuition behind Mondrian Trees
 
-This example provides intuition behind the MondrianTreeRegressor. Explanations of the tree construction and prediction will be highlighted.
-
+This example provides intuition behind Mondrian Trees. In particular, the differences between existing decision tree algorithms and explanations of the tree construction and prediction will be highlighted.
 
 ```python
-# Import necessary stuff
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.tree import ExtraTreeRegressor
@@ -13,11 +11,24 @@ from itertools import cycle
 %matplotlib inline
 ```
 
-##  Extremely Randomized Tree - Recap
+##  A decision tree regressor
 
-In a tree-based algorithm, the decision rule at every node is constructed by considering a set of candidate split points. The candidate split point that maximizes the decrease in impurity among the resulting child nodes (generally the mean squared error in case of continuous values) is chosen. In an extremely randomized tree, the number of candidate splits `S` are limited to `max_features` and each candidate split `S[i]` is drawn uniformly from the bounds `(l_f[i], u_f[i])`.
+A decision tree is one of the easier-to-understand machine learning algorithms. While training, the input training space `X` is recursively partitioned into a number of rectangular subspaces. While predicting the label of a new point, one determines the rectangular subspace that it falls into and outputs the label representative of that subspace. This is usually the mean of the labels for a regression problem.
 
-In a single extremely randomized tree, this construction might seem suboptimal but while constructing an ensemble of trees, it makes sure that each tree constructed in an independent fashion. Decorrelating predictions in an ensemble is a key factor to achieve lower generalization error. In addition, limiting the number of candidate split points makes the tree construction very fast. Let us now generate some toy data.
+The rectangular subspaces are constructed in a greedy manner doing a binary partition at a time, hence each split is determined by a (f, \(\delta)\) tuple. The point `X` for which `X[f]` is lesser than \(\delta\) are in the left subspace and vice versa.
+
+## So how is each split done?
+
+The split tuple (f, \(\delta)\) is determined as that combination that creates child nodes such that the weighted decrease in impurity is maximum. Mathematically, this is the combination that maximises, `N_{parent} Imp_{Parent} - N_{left} Imp}_{left} - N_{right} Imp{right}`
+
+In a standard decision tree, this combination is found out by searching though all possible combinations of feature indices and values in the training data. That sounds pretty expensive!
+
+In an extremely randomized tree, this is made much faster by limiting the number of candidate splits `S` are limited to another hyperparameter `max_features`. Each candidate split `S[i]` is then drawn uniformly from the bounds `(l_f[i], u_f[i])`.
+
+#### Note:
+It is important to note that the actual reason is that while constructing an ensemble of trees, it makes sure that each tree constructed in an independent fashion. Decorrelating predictions in an ensemble is a key factor to achieve lower generalization error. For a highly unlikely corner case, if each tree in an ensemble is exactly the same, then there is no pont constructing the ensemble.
+
+Let us now generate some toy data to play with it in the remainder of this example. Here toy data, meaning a set of ten points that lie on a sine curve.
 
 
 ```python
@@ -67,67 +78,81 @@ plt.show()
 
 ![png](../mondrian_tree/plot2.png)
 
-The blue line represents the mean prediction in every region of the decision space.
 
-We notice that as we move away from the training data
+The blue line represents the mean prediction in every region of the decision space. So if a point lies between -6 and -3, we predict y to be 0.0 and so on.
 
-1. The predicted mean remains constant.
-2. It is determined by the decision split at the bounds of the space.
+There are two things to notice.
 
-Ideally, as move away from the training data we are unsure about the target value to predict and would like to fall back on some prior mean. The mondrian tree solves this problem in a very intelligent way.
+1. As we move away from the training data, the predicted mean remains constant which is determined by the decision split at the bounds of the space. But in reality, we are unsure about the target value to predict and would like to fall back on some prior mean.
+2. In an extremely randomized tree, this issue is not confined to subspaces at the edge of the training subspace. Even if the green subspace was not at the edge, we are unsure about the region from 4 to 6 since the train points are confined till 4.0
+
+The mondrian tree solves this problem in a very intelligent way.
 
 ##  Mondrian Tree
 
 ### Train mode
 
-At every node, the split threshold and feature is decided independently of the target or the decrease in impurity! Yes, that is right.
+The split tuple (f, \(\delta)\) is decided independently of the target or the decrease in impurity! Yes, that is right. When all the features are of same scale and are equally important, this is same as an extremely randomized tree with `max_features` set to 1.
 
-1. The split feature index `f` is drawn with a probability proportional to `u_b[f] - l_b[f]` where `u_b` and `l_b` and the upper and lower bounds of all the features. When all the features are of same scale, this is same as an ExtraTreeRegressor with `max_features` set to 1.
+1. The split feature index `f` is drawn with a probability proportional to `u_b[f] - l_b[f]` where `u_b` and `l_b` and the upper and lower bounds of all the features.
 2. After fixing the feature index, the split threshold \(\delta\) is then drawn from a uniform distribution with limits `l_b`, `u_b`.
 
-The intuition being that a feature that has a huge difference between the bounds is likelier to be an "important" feature.
+The intuition being that a feature that has a huge difference between the bounds is likelier to be an "important" feature. Every subspace `j` in a mondrian tree also stores information about.
 
-At every node, in a decision tree, the mean and impurity are stored (or class probabilities in case of classification). In addition to this, every node `j` in a mondrian tree tracks two other things.
+1. The upper and lower bounds of all the features in that particular node or the bounding box as determined by the training data. For example, in the green subspace above it stores ((1.96, 3.0),)
+2. The time of split \(\tau\) which is drawn from an exponential with mean \(\sum_{f=1}^D(u_b[f] - l_b[f])\). Smaller the value of tau, larger is the bounding box.
 
-1. The upper and lower bounds of all the features in that particular node.
-2. The time of split, which is drawn from an exponential with mean \(\sum_{f=1}^D(u_b[f] - l_b[f])\)
-
-If you stare at the equation for half a minute, that makes sense as well because the larger the bounding box of a node, the time of split is smaller. Also the above property sets the time of split of leaves to infinity. Once the split feature and threshold are decided, then the tree construction happens in a similar way to that of a decision tree, a node splits the training data into two parts, \(X[:, f] < \delta\) to one leaf and \(X[:, f] > \delta\) to the other.
+#### Note:
+The time of split can be viewed as weighted depth. Imagine that edges between parent and child nodes are associated with a non-negative weight. The time of split at a node is the sum of the weights along the path from the root to the node. If weights are all 1, the time of split is the depth of the node.
 
 ###  Prediction mode
+From now on, we will use the terms node and subspace interchangeably. The subspace that a new point ends up in is the leaf, the entire training space is the root and every binary partition results in two nodes.
 
-Recall that for a decision tree, for a new training point, computing the predictive mean and variance is fairly straightforward. That is, find the leaf node that a new training point lands in and output the mean and variance of the node.
+Recall that for a decision tree, computing the prediction for a new point is fairly straightforward. Find the leaf node that a new point lands in and output the mean.
 
-The prediction step of a Mondrian Tree is a bit more complicated. It takes into account all the nodes in the path of a new point from the root to the leaf for making a prediction. Mathematically, the distribution of
-\(P(Y | X)\) is given by
+The prediction step of a Mondrian Tree is a bit more complicated. It takes into account all the nodes in the path of a new point from the root to the leaf for making a prediction. This formulation allows us the flexibility to weigh the nodes on the basis of how sure/unsure we are about the prediction in that particular node.
+
+Mathematically, the distribution of \(P(Y | X)\) is given by
 
 \(P(Y | X) = \sum_{j} w_j \mathcal{N} (m_j, v_j)\)
 
-where the summation is across all the nodes in the path from the root to the leaf.
+where the summation is across all the nodes in the path from the root to the leaf. The mean prediction becomes \(\sum_{j} w_j m_j\)
 
-To compute the weights given to each node, we need to compute the probability of separation \(p_j(x)\) of each node. This is computed in the following way.
+### Computing the weights.
 
-1. \(\Delta_{j} = \tau_{j} - \tau_{parent(j)}\)
-2. \(\eta_{j}(x) = \sum_{f}(\max(x[f] - u_{bj}[f], 0) + \max(0, l_{bj}[f] - x[f]))\)
-3. \(p_j(x) = 1 - e^{-\Delta_{j} \eta_{j}(x))}\)
+Assume \(p_j(x)\) denote the probability of a new point splitting away from a node. That is higher the probability, the farther away it is from the bounding box at that node.
 
-And then the weights are given by:
+A point which is within the bounds at any node, the probability of separation should be zero. This means we can obtain a better estimate about the prediction from its child node.
+
+Also, the node at which the new point starts to split away is the node that we are most confident about. So this should be given a high weight.
+
+Formally, the weights are computed like this.
 
 If `j` is not a leaf:
 
 \(w_j(x) = p_j(x) \prod_{k \in anc(j)} (1 - p_k(x))\)
 
-If j is a leaf:
+If `j` is a leaf, to make the weights sum up to one.
 
 \(w_j(x) = 1 - \sum_{k \in anc(j)} w_k(x)\)
 
-Let us take a more than half a minute to stare at these equations and understand what they mean.
+\(w_j\) can be decomposed into two factors, \(p_j\)(x) and \(\prod_{k \in anc(j)} (1 - p_k(x))\). The first one being the probability of splitting away at that particular node and the second one being the probability of not splitting away till it reaches that node. We can observe that for \(x\) that is completely within the bounds of a node, \(w_j(x)\) becomes zero and for a point where it starts branching off, \(w_j(x) = p_j(x)\)
+
+
+### Computing the probability of separation.
+
+We come to the final piece in the jigsaw puzzle, that is computing the probability of separation \(p_j(x)\) of each node. This is computed in the following way.
+
+1. \(\Delta_{j} = \tau_{j} - \tau_{parent(j)}\)
+2. \(\eta_{j}(x) = \sum_{f}(\max(x[f] - u_{bj}[f], 0) + \max(0, l_{bj}[f] - x[f]))\)
+3. \(p_j(x) = 1 - e^{-\Delta_{j} \eta_{j}(x))}\)
+
+Let us take some time to stare at these equations and understand what they mean.
 
 1. \(p_j(x)\) is high when \(\eta_{j}(x)\) is high. As \(\eta_{j}(x)\) approaches infinity, \(p_j(x)\) approaches zero. This means that when the point is far away from the bounding box of the node, the probability of separation becomes high.
 2. \(p_j(x)\) is high when \(\Delta{j}\) is high. This means when the bounding box of a node is small as compared to the bounding box of its parent, the probability of separation becomes high.
-3. The weight given to each node, \(w_j\) can be decomposed into two factors, \(p_j\) and \(\prod_{k \in anc(j)} (1 - p_k(x))\). The product term can be understood as the probability of that point not being separated till that particular node is reached. So the node where a new point just starts to branch of is given the highest weight.
-4. For a point in the training data, \(p_j(x)\) becomes zero all nodes (and hence \(w_j(x)\)). The leaf then has a weightage of 1.0 and this reduces to a standard decision tree prediction.
-5. For a point, far away from the training data, \(p_{root}(x)\) approaches one and by 3. the weights of the other nodes in the path from the root to the leaf approach zero. This means \(P(Y | X) ~ \mathcal{N}(m, v)) where \(m)\ and \(var\) are the empirical mean and variance of the training data.
+3. For a point in the training data, \(p_j(x)\) becomes zero for all nodes other than the leaf since the point is within the bounding box at all nodes. The leaf then has a weightage of 1.0 and this reduces to a standard decision tree prediction.
+4. For a point far away from the training data, \(p_{root}(x)\) (and \(w_{root}(x)\)) approach one and hence the weights of the other nodes in the path from the root to the leaf approach zero. This means \(P(Y | X) = \mathcal{N}(m, v)\) where \(m\) and \(v\) are the empirical mean and variance of the training data.
 
 ## Plotting decision boundaries (and more) using Mondrian Trees
 
@@ -140,11 +165,11 @@ mtr = MondrianTreeRegressor(random_state=1, max_depth=2)
 mtr.fit(X_train, y_train)
 y_pred, y_std = mtr.predict(X_test, return_std=True)
 
-# This is a method that provides the weights at each node while making predictions.
+# This is a method that provides the weights given to each node while making predictions.
 weights = mtr.weighted_decision_path(X_test).toarray()
 ```
 
-### Helper function to plot bounds and decision boundaries at every node.
+### Function to plot bounds and decision boundaries at every node.
 
 
 ```python
@@ -186,7 +211,7 @@ def plot_bounds_with_decision_boundaries(axis, X_tr, y_tr, X_te, y_te, tree_reg,
             axis.axvline(np.max(X_1D))
 ```
 
-### Helper function to plot the weights at each node.
+### Function to plot the weights at each node.
 
 
 ```python
@@ -242,17 +267,16 @@ plot_bounds_with_decision_boundaries(
 
 ### Interpretation
 
-Let us look at the plots from top to bottom.
+Let us interpret the plots from top to bottom.
 
 1. Depth zero: root
 
     * Weights are zero within the bounding box.
-    * Weights start to increase as we move away from the bounding box.
+    * Weights start to increase as we move away from the bounding box, if we move far enough they will become one.
 
 2. Depth one
 
-    * Bounding box on the left is smaller than that of the right. Hence the time of split of the left bounding box is  
-      larger which makes the probability of separation higher and the weights are larger.
+    * Bounding box of left child is smaller than that of the right. Hence the time of split of the left bounding box   is larger which makes the probability of separation higher and the weights are larger.
     * The small spike in the middle is because of the thin strip between both the bounding boxes. The probability of
       separation here is non-zero and hence the weights are non-zero
 
@@ -260,14 +284,19 @@ Let us look at the plots from top to bottom.
 
      * The weights here are just so that the total weights sum up to one.
 
+### Conclusion
+
+In conclusion, the mondrian tree regressor unlike standard decision tree implementations does not limit itself to
+the leaf in making predictions. It takes into account the entire path from the root to the leaf and weighs it according to the distance from the bounding box in that node. This has some interesting properties such as falling back to the prior mean and variance for points far away from the training data.
+
 
 ### References:
 1. Decision Trees and Forests: A Probabilistic Perspective, Balaji Lakshminarayanan
- http://www.gatsby.ucl.ac.uk/~balaji/balaji-phd-thesis.pdf
+ [http://www.gatsby.ucl.ac.uk/~balaji/balaji-phd-thesis.pdf](http://www.gatsby.ucl.ac.uk/~balaji/balaji-phd-thesis.pdf)
 2. scikit-learn documentation
-http://scikit-learn.org/
+[http://scikit-learn.org/](http://scikit-learn.org/)
 3. Understanding Random Forests, Gilles Louppe
-https://arxiv.org/abs/1407.7502
+[https://arxiv.org/abs/1407.7502](https://arxiv.org/abs/1407.7502)
 
 ### Acknowledgements
 This tutorial mainly arises from discussions with Gilles Louppe and Balaji Lakshminarayanan for which I am hugely grateful.
