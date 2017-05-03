@@ -1,6 +1,6 @@
-# Intuition behind MondrianTrees
+# Intuition behind Mondrian Trees
 
-This example provides an intuition behind the MondrianTreeRegressor. In particular, the key differences between an extremely randomized tree and explanations of the tree construction and prediction will be higlighted.
+This example provides intuition behind the MondrianTreeRegressor. Explanations of the tree construction and prediction will be highlighted.
 
 
 ```python
@@ -15,9 +15,9 @@ from itertools import cycle
 
 ##  Extremely Randomized Tree - Recap
 
-In a tree-based algorithm, the decision rule at every node is constructed by considering a set of candidate split points and that candidate split point that minimizes a certain impurity (generally the mse in case of continuous values) is chosen. In an extremely randomized tree, the number of candidate splits `S` are limited to `n_features` and each candidate split `S[i]` is drawn unifomly from the bounds `(l_f[i], u_f[i])`.
+In a tree-based algorithm, the decision rule at every node is constructed by considering a set of candidate split points. The candidate split point that maximizes the decrease in impurity among the resulting child nodes (generally the mean squared error in case of continuous values) is chosen. In an extremely randomized tree, the number of candidate splits `S` are limited to `max_features` and each candidate split `S[i]` is drawn uniformly from the bounds `(l_f[i], u_f[i])`.
 
-In a single extremely randomized tree, this construction might seem suboptimal but while constructing an ensemble of trees, it makes sure that each tree constructed in an independent fashion. In addition, limiting the number of candidate split points makes the tree construction very fast. Let us now generate some toy data.
+In a single extremely randomized tree, this construction might seem suboptimal but while constructing an ensemble of trees, it makes sure that each tree constructed in an independent fashion. Decorrelating predictions in an ensemble is a key factor to achieve lower generalization error. In addition, limiting the number of candidate split points makes the tree construction very fast. Let us now generate some toy data.
 
 
 ```python
@@ -39,7 +39,7 @@ plt.show()
 
 ## Plotting decision boundaries using ERT's
 
-Let us now scikit-learn's ExtraTreeRegressor to train on the generated toy data, predict on some unseen data and plot decision boundaries in the 1-D space. Also, we set the `max_depth` parameter to 2, which means there can be a maximum of 4 decision boundaries in the 1-D space.
+Let us now use scikit-learn's ExtraTreeRegressor to train on the generated toy data, predict on some unseen data and plot decision boundaries in the 1-D space. Also, we set the `max_depth` parameter to 2, which means there can be a maximum of 4 decision boundaries in the 1-D space.
 
 
 ```python
@@ -78,11 +78,11 @@ Ideally, as move away from the training data we are unsure about the target valu
 
 ##  Mondrian Tree
 
-### Train time
+### Train mode
 
 At every node, the split threshold and feature is decided independently of the target or the decrease in impurity! Yes, that is right.
 
-1. The split feature index `f` is drawn with a probability proportional to `u_b[f] - l_b[f]` where `u_b` and `l_b` and the upper and lower bounds of all the features.
+1. The split feature index `f` is drawn with a probability proportional to `u_b[f] - l_b[f]` where `u_b` and `l_b` and the upper and lower bounds of all the features. When all the features are of same scale, this is same as an ExtraTreeRegressor with `max_features` set to 1.
 2. After fixing the feature index, the split threshold \(\delta\) is then drawn from a uniform distribution with limits `l_b`, `u_b`.
 
 The intuition being that a feature that has a huge difference between the bounds is likelier to be an "important" feature.
@@ -94,7 +94,7 @@ At every node, in a decision tree, the mean and impurity are stored (or class pr
 
 If you stare at the equation for half a minute, that makes sense as well because the larger the bounding box of a node, the time of split is smaller. Also the above property sets the time of split of leaves to infinity. Once the split feature and threshold are decided, then the tree construction happens in a similar way to that of a decision tree, a node splits the training data into two parts, \(X[:, f] < \delta\) to one leaf and \(X[:, f] > \delta\) to the other.
 
-###  Prediction time
+###  Prediction mode
 
 Recall that for a decision tree, for a new training point, computing the predictive mean and variance is fairly straightforward. That is, find the leaf node that a new training point lands in and output the mean and variance of the node.
 
@@ -127,8 +127,9 @@ Let us take a more than half a minute to stare at these equations and understand
 2. \(p_j(x)\) is high when \(\Delta{j}\) is high. This means when the bounding box of a node is small as compared to the bounding box of its parent, the probability of separation becomes high.
 3. The weight given to each node, \(w_j\) can be decomposed into two factors, \(p_j\) and \(\prod_{k \in anc(j)} (1 - p_k(x))\). The product term can be understood as the probability of that point not being separated till that particular node is reached. So the node where a new point just starts to branch of is given the highest weight.
 4. For a point in the training data, \(p_j(x)\) becomes zero all nodes (and hence \(w_j(x)\)). The leaf then has a weightage of 1.0 and this reduces to a standard decision tree prediction.
+5. For a point, far away from the training data, \(p_{root}(x)\) approaches one and by 3. the weights of the other nodes in the path from the root to the leaf approach zero. This means \(P(Y | X) ~ \mathcal{N}(m, v)) where \(m)\ and \(var\) are the empirical mean and variance of the training data.
 
-## Plotting decision boundaries (and more) using MondrianTrees
+## Plotting decision boundaries (and more) using Mondrian Trees
 
 ### Generate data, fit and predict
 
@@ -259,15 +260,14 @@ Let us look at the plots from top to bottom.
 
      * The weights here are just so that the total weights sum up to one.
 
-###  Predictive mean and variance
 
-Writing \(P(Y | X)\) as a GMM model, enables us to derive the mean and variance quite easily. Here is a plot showing the predictive mean and variance.
+### References:
+1. Decision Trees and Forests: A Probabilistic Perspective, Balaji Lakshminarayanan
+ http://www.gatsby.ucl.ac.uk/~balaji/balaji-phd-thesis.pdf
+2. scikit-learn documentation
+http://scikit-learn.org/
+3. Understanding Random Forests, Gilles Louppe
+https://arxiv.org/abs/1407.7502
 
-
-```python
-plt.plot(X_train, y_train, "ro")
-plt.plot(X_test, y_pred)
-plt.fill_between(X_test.ravel(), y_pred + 1.96*y_std, y_pred - 1.96*y_std, alpha=0.2)
-```
-
-![png](../mondrian_tree/plot4.png)
+### Acknowledgements
+This tutorial mainly arises from discussions with Gilles Louppe and Balaji Lakshminarayanan for which I am hugely grateful.
