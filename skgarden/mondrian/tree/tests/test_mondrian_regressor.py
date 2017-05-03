@@ -270,3 +270,31 @@ def test_mean_std():
     inf_mean, inf_std = mr.predict(X_inf, return_std=True)
     assert_array_almost_equal(inf_mean, y.mean(), 1)
     assert_array_almost_equal(inf_std, y.std(), 2)
+
+
+def check_tree_attributes(X, y, node_id, tree):
+    """
+    Recursive function to test the mean and variance at every node.
+    """
+    assert_almost_equal(np.var(y), tree.variance[node_id])
+    assert_almost_equal(np.mean(y), tree.mean[node_id])
+    assert_almost_equal(np.var(y), tree.impurity[node_id])
+    left_child = tree.children_left[node_id]
+    right_child = tree.children_right[node_id]
+
+    if left_child != -1:
+        left_ind = X[:, tree.feature[node_id]] < tree.threshold[node_id]
+        check_tree_attributes(X[left_ind], y[left_ind], left_child, tree)
+
+    if right_child != -1:
+        right_ind = X[:, tree.feature[node_id]] > tree.threshold[node_id]
+        check_tree_attributes(X[right_ind], y[right_ind], right_child, tree)
+
+
+def test_tree_attributes():
+    rng = np.random.RandomState(0)
+    X = rng.randn(20, 5)
+    y = np.sum(X[:, :4], axis=1)
+    mr = MondrianTreeRegressor(random_state=0)
+    mr.fit(X, y)
+    check_tree_attributes(X, y, 0, mr.tree_)
