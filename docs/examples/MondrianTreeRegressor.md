@@ -25,7 +25,12 @@ The optimal split \(S_{opt}\) is determined by \((f_{opt}, \delta_{opt}\)) that 
 
 In a standard decision tree, \(S_{opt}\) is found out by searching though all possible combinations of feature indices and values in the training data and simply returning the combination that minimizes C as described above. That sounds pretty expensive!
 
-In an extremely randomized tree, this is made much faster by limiting the number of splits to another hyperparameter \(max_{features}\). Each split `S[i]` is then determined by (\(max_{features}[i], \delta_i\)) where \(\delta_i\) is drawn uniformly from the bounds of \(max_{features}[i]\).
+In an extremely randomized tree this is made much faster by the following procedure.
+
+1. The feature indices of the candidate splits are determined by drawing `max_features` at random.
+2. Then for each of these feature index, we select the split threshold by drawing uniformly between the bounds of that feature.
+
+When the set of candidate splits are obtained, as before we just return that split that minimizes `C`.
 
 #### Note:
 It is important to note that the actual reason is that while constructing an ensemble of trees, it makes sure that each tree constructed in an independent fashion. Decorrelating predictions in an ensemble is a key factor to achieve lower generalization error. For a highly unlikely corner case, if each tree in an ensemble is exactly the same, then there is no point constructing the ensemble.
