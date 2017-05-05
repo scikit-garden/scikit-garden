@@ -15,18 +15,20 @@ from itertools import cycle
 
 A decision tree is one of the easier-to-understand machine learning algorithms. While training, the input training space `X` is recursively partitioned into a number of rectangular subspaces. While predicting the label of a new point, one determines the rectangular subspace that it falls into and outputs the label representative of that subspace. This is usually the mean of the labels for a regression problem.
 
-The rectangular subspaces are constructed in a greedy manner doing a binary partition at a time, hence each split is determined by a (f, \(\delta)\) tuple. The point `X` for which `X[f]` is lesser than \(\delta\) are in the left subspace and vice versa.
+The rectangular subspaces are constructed in a greedy manner doing a binary partition at a time. Hence this can be determined by a split `S`, a (f, \(\delta)\) tuple where f is the feature index and \(\delta\) is the threshold across which to split.
+
+A point `x` for which `x[f]` is lesser than \(\delta\) is placed in the left subspace and vice versa.
 
 ## So how is each split done?
 
-The split tuple (f, \(\delta)\) is determined as that combination that creates child nodes such that the weighted decrease in impurity is maximum. Mathematically, this is the combination that maximises, `N_{parent} Imp_{Parent} - N_{left} Imp}_{left} - N_{right} Imp{right}`
+The optimal split \(S_{opt}\) is determined by \((f_{opt}, \delta_{opt}\)) that creates children such that the weighted decrease in impurity is maximum. Mathematically, this is the combination that maximizes, \(C=N_{parent} Imp_{Parent} - N_{left} Imp_{left} - N_{right} Imp_{right}\), where \(N_{parent}, N_{left}, N_{right}\) are the number of samples in the parent, left and right subspaces.
 
-In a standard decision tree, this combination is found out by searching though all possible combinations of feature indices and values in the training data. That sounds pretty expensive!
+In a standard decision tree, \(S_{opt}\) is found out by searching though all possible combinations of feature indices and values in the training data and simply returning the combination that minimizes C as described above. That sounds pretty expensive!
 
-In an extremely randomized tree, this is made much faster by limiting the number of candidate splits `S` are limited to another hyperparameter `max_features`. Each candidate split `S[i]` is then drawn uniformly from the bounds `(l_f[i], u_f[i])`.
+In an extremely randomized tree, this is made much faster by limiting the number of splits to another hyperparameter \(max_{features}\). Each split `S[i]` is then determined by (\(max_{features}[i], \delta_i\)) where \(\delta_i\) is drawn uniformly from the bounds of \(max_{features}[i]\).
 
 #### Note:
-It is important to note that the actual reason is that while constructing an ensemble of trees, it makes sure that each tree constructed in an independent fashion. Decorrelating predictions in an ensemble is a key factor to achieve lower generalization error. For a highly unlikely corner case, if each tree in an ensemble is exactly the same, then there is no pont constructing the ensemble.
+It is important to note that the actual reason is that while constructing an ensemble of trees, it makes sure that each tree constructed in an independent fashion. Decorrelating predictions in an ensemble is a key factor to achieve lower generalization error. For a highly unlikely corner case, if each tree in an ensemble is exactly the same, then there is no point constructing the ensemble.
 
 Let us now generate some toy data to play with it in the remainder of this example. Here toy data, meaning a set of ten points that lie on a sine curve.
 
@@ -50,7 +52,7 @@ plt.show()
 
 ## Plotting decision boundaries using ERT's
 
-Let us now use scikit-learn's ExtraTreeRegressor to train on the generated toy data, predict on some unseen data and plot decision boundaries in the 1-D space. Also, we set the `max_depth` parameter to 2, which means there can be a maximum of 4 decision boundaries in the 1-D space.
+Let us now use scikit-learn's `ExtraTreeRegressor` to train on the generated toy data, predict on some unseen data and plot decision boundaries in the 1-D space. Also, we set the `max_depth` parameter to 2, which means there can be a maximum of 4 decision boundaries in the 1-D space.
 
 
 ```python
