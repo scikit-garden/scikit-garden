@@ -4,5 +4,6 @@ classification and regression.
 """
 
 from .tree import MondrianTreeRegressor
+from .tree import MondrianTreeClassifier
 
-__all__ = ["MondrianTreeRegressor"]
+__all__ = ["MondrianTreeClassifier", "MondrianTreeRegressor"]
