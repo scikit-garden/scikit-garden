@@ -1,6 +1,7 @@
 from .forest import RandomForestRegressor
 from .forest import ExtraTreesRegressor
 from .gbrt import GradientBoostingQuantileRegressor
+from .mondrian import MondrianForestClassifier
 from .mondrian import MondrianForestRegressor
 from .mondrian import MondrianTreeClassifier
 from .mondrian import MondrianTreeRegressor
