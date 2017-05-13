@@ -176,10 +176,10 @@ class MondrianForestRegressor(ForestRegressor, BaseMondrian):
 
 class MondrianForestClassifier(ForestClassifier, BaseMondrian):
     """
-    A MondrianForestRegressor is an ensemble of MondrianTreeRegressors.
+    A MondrianForestClassifier is an ensemble of MondrianTreeClassifiers.
 
-    The variance in predictions is reduced by averaging the predictions
-    from all trees.
+    The probability \(p_{j}\) of class \(j\) is given
+    $$\sum_{i}^{N_{est}} \\frac{p_{j}^i}{N_{est}}$$
 
     Parameters
     ----------
