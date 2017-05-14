@@ -79,7 +79,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
                  splitter,
                  max_depth,
                  min_samples_split,
-                 min_samples_leaf,
                  min_weight_fraction_leaf,
                  max_features,
                  max_leaf_nodes,
@@ -90,7 +89,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         self.splitter = splitter
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
-        self.min_samples_leaf = min_samples_leaf
         self.min_weight_fraction_leaf = min_weight_fraction_leaf
         self.max_features = max_features
         self.random_state = random_state
@@ -156,19 +154,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         max_leaf_nodes = (-1 if self.max_leaf_nodes is None
                           else self.max_leaf_nodes)
 
-        if isinstance(self.min_samples_leaf, (numbers.Integral, np.integer)):
-            if not 1 <= self.min_samples_leaf:
-                raise ValueError("min_samples_leaf must be at least 1 "
-                                 "or in (0, 0.5], got %s"
-                                 % self.min_samples_leaf)
-            min_samples_leaf = self.min_samples_leaf
-        else:  # float
-            if not 0. < self.min_samples_leaf <= 0.5:
-                raise ValueError("min_samples_leaf must be at least 1 "
-                                 "or in (0, 0.5], got %s"
-                                 % self.min_samples_leaf)
-            min_samples_leaf = int(ceil(self.min_samples_leaf * n_samples))
-
         if isinstance(self.min_samples_split, (numbers.Integral, np.integer)):
             if not 2 <= self.min_samples_split:
                 raise ValueError("min_samples_split must be an integer "
@@ -184,8 +169,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
                                  % self.min_samples_split)
             min_samples_split = int(ceil(self.min_samples_split * n_samples))
             min_samples_split = max(2, min_samples_split)
-
-        min_samples_split = max(min_samples_split, 2 * min_samples_leaf)
 
         if isinstance(self.max_features, six.string_types):
             if self.max_features == "auto":
@@ -298,7 +281,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         if not isinstance(self.splitter, Splitter):
             splitter = SPLITTERS[self.splitter](criterion,
                                                 self.max_features_,
-                                                min_samples_leaf,
                                                 min_weight_leaf,
                                                 random_state,
                                                 self.presort)
@@ -306,7 +288,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
 
         builder = DepthFirstTreeBuilder(splitter, min_samples_split,
-                                        min_samples_leaf,
                                         min_weight_leaf,
                                         max_depth)
         builder.build(self.tree_, X, y, sample_weight, X_idx_sorted)
@@ -532,7 +513,6 @@ class MondrianTreeRegressor(BaseMondrianTree, RegressorMixin):
             splitter="mondrian",
             max_depth=max_depth,
             min_samples_split=min_samples_split,
-            min_samples_leaf=1,
             min_weight_fraction_leaf=0.0,
             max_features=None,
             random_state=random_state,
@@ -550,7 +530,6 @@ class MondrianTreeClassifier(BaseMondrianTree, ClassifierMixin):
             splitter="mondrian",
             max_depth=max_depth,
             min_samples_split=min_samples_split,
-            min_samples_leaf=1,
             min_weight_fraction_leaf=0.0,
             max_features=None,
             random_state=random_state,

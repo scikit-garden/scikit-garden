@@ -46,8 +46,8 @@ cdef class Splitter:
     """
 
     def __cinit__(self, Criterion criterion, SIZE_t max_features,
-                  SIZE_t min_samples_leaf, double min_weight_leaf,
-                  object random_state, bint presort):
+                  double min_weight_leaf, object random_state,
+                  bint presort):
         """
         Parameters
         ----------
@@ -57,11 +57,6 @@ cdef class Splitter:
         max_features : SIZE_t
             The maximal number of randomly selected features which can be
             considered for a split.
-
-        min_samples_leaf : SIZE_t
-            The minimal number of samples each leaf can have, where splits
-            which would result in having less samples in a leaf are not
-            considered.
 
         min_weight_leaf : double
             The minimal weight each leaf can have, where the weight is the sum
@@ -84,7 +79,6 @@ cdef class Splitter:
         self.sample_weight = NULL
 
         self.max_features = max_features
-        self.min_samples_leaf = min_samples_leaf
         self.min_weight_leaf = min_weight_leaf
         self.random_state = random_state
         self.presort = presort
@@ -240,8 +234,8 @@ cdef class BaseDenseSplitter(Splitter):
     cdef SIZE_t* sample_mask
 
     def __cinit__(self, Criterion criterion, SIZE_t max_features,
-                  SIZE_t min_samples_leaf, double min_weight_leaf,
-                  object random_state, bint presort):
+                  double min_weight_leaf, object random_state,
+                  bint presort):
 
         self.X = NULL
         self.X_sample_stride = 0
@@ -300,7 +294,6 @@ cdef class MondrianSplitter(BaseDenseSplitter):
     def __reduce__(self):
         return (MondrianSplitter, (self.criterion,
                                    self.max_features,
-                                   self.min_samples_leaf,
                                    self.min_weight_leaf,
                                    self.random_state,
                                    self.presort), self.__getstate__())
