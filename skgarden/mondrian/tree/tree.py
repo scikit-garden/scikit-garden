@@ -79,7 +79,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
                  splitter,
                  max_depth,
                  min_samples_split,
-                 max_leaf_nodes,
                  random_state,
                  class_weight=None,
                  presort=False):
@@ -88,7 +87,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.random_state = random_state
-        self.max_leaf_nodes = max_leaf_nodes
         self.class_weight = class_weight
         self.presort = presort
 
@@ -147,8 +145,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         # Check parameters
         max_depth = ((2 ** 31) - 1 if self.max_depth is None
                      else self.max_depth)
-        max_leaf_nodes = (-1 if self.max_leaf_nodes is None
-                          else self.max_leaf_nodes)
 
         if isinstance(self.min_samples_split, (numbers.Integral, np.integer)):
             if not 2 <= self.min_samples_split:
@@ -171,12 +167,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
                              "number of samples=%d" % (len(y), n_samples))
         if max_depth <= 0:
             raise ValueError("max_depth must be greater than zero. ")
-        if not isinstance(max_leaf_nodes, (numbers.Integral, np.integer)):
-            raise ValueError("max_leaf_nodes must be integral number but was "
-                             "%r" % max_leaf_nodes)
-        if -1 < max_leaf_nodes < 2:
-            raise ValueError(("max_leaf_nodes {0} must be either smaller than "
-                              "0 or larger than 1").format(max_leaf_nodes))
 
         if sample_weight is not None:
             if (getattr(sample_weight, "dtype", None) != DOUBLE or
@@ -468,7 +458,6 @@ class MondrianTreeRegressor(BaseMondrianTree, RegressorMixin):
             max_depth=max_depth,
             min_samples_split=min_samples_split,
             random_state=random_state,
-            max_leaf_nodes=None,
             presort=False)
 
 
@@ -483,7 +472,6 @@ class MondrianTreeClassifier(BaseMondrianTree, ClassifierMixin):
             max_depth=max_depth,
             min_samples_split=min_samples_split,
             random_state=random_state,
-            max_leaf_nodes=None,
             presort=False)
 
     def predict_proba(self, X, check_input=True):
