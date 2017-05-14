@@ -79,7 +79,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
                  splitter,
                  max_depth,
                  min_samples_split,
-                 min_weight_fraction_leaf,
                  max_features,
                  max_leaf_nodes,
                  random_state,
@@ -89,7 +88,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         self.splitter = splitter
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
-        self.min_weight_fraction_leaf = min_weight_fraction_leaf
         self.max_features = max_features
         self.random_state = random_state
         self.max_leaf_nodes = max_leaf_nodes
@@ -200,8 +198,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         if len(y) != n_samples:
             raise ValueError("Number of labels=%d does not match "
                              "number of samples=%d" % (len(y), n_samples))
-        if not 0 <= self.min_weight_fraction_leaf <= 0.5:
-            raise ValueError("min_weight_fraction_leaf must in [0, 0.5]")
         if max_depth <= 0:
             raise ValueError("max_depth must be greater than zero. ")
         if not (0 < max_features <= self.n_features_):
@@ -232,14 +228,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
                 sample_weight = sample_weight * expanded_class_weight
             else:
                 sample_weight = expanded_class_weight
-
-        # Set min_weight_leaf from min_weight_fraction_leaf
-        if sample_weight is None:
-            min_weight_leaf = (self.min_weight_fraction_leaf *
-                               n_samples)
-        else:
-            min_weight_leaf = (self.min_weight_fraction_leaf *
-                               np.sum(sample_weight))
 
         presort = self.presort
         # Allow presort to be 'auto', which means True if the dataset is dense,
@@ -281,14 +269,12 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         if not isinstance(self.splitter, Splitter):
             splitter = SPLITTERS[self.splitter](criterion,
                                                 self.max_features_,
-                                                min_weight_leaf,
                                                 random_state,
                                                 self.presort)
 
         self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
 
         builder = DepthFirstTreeBuilder(splitter, min_samples_split,
-                                        min_weight_leaf,
                                         max_depth)
         builder.build(self.tree_, X, y, sample_weight, X_idx_sorted)
 
@@ -513,7 +499,6 @@ class MondrianTreeRegressor(BaseMondrianTree, RegressorMixin):
             splitter="mondrian",
             max_depth=max_depth,
             min_samples_split=min_samples_split,
-            min_weight_fraction_leaf=0.0,
             max_features=None,
             random_state=random_state,
             max_leaf_nodes=None,
@@ -530,7 +515,6 @@ class MondrianTreeClassifier(BaseMondrianTree, ClassifierMixin):
             splitter="mondrian",
             max_depth=max_depth,
             min_samples_split=min_samples_split,
-            min_weight_fraction_leaf=0.0,
             max_features=None,
             random_state=random_state,
             max_leaf_nodes=None,

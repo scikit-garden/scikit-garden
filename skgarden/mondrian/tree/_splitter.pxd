@@ -41,7 +41,6 @@ cdef class Splitter:
     # Internal structures
     cdef public Criterion criterion      # Impurity criterion
     cdef public SIZE_t max_features      # Number of features to test
-    cdef public double min_weight_leaf   # Minimum weight in a leaf
 
     cdef object random_state             # Random state
     cdef UINT32_t rand_r_state           # sklearn_rand_r random number state

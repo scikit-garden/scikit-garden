@@ -135,10 +135,9 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
     """Build a decision tree in depth-first fashion."""
 
     def __cinit__(self, Splitter splitter, SIZE_t min_samples_split,
-                  double min_weight_leaf, SIZE_t max_depth):
+                  SIZE_t max_depth):
         self.splitter = splitter
         self.min_samples_split = min_samples_split
-        self.min_weight_leaf = min_weight_leaf
         self.max_depth = max_depth
 
     cpdef build(self, Tree tree, object X, np.ndarray y,
@@ -166,7 +165,6 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
         # Parameters
         cdef Splitter splitter = self.splitter
         cdef SIZE_t max_depth = self.max_depth
-        cdef double min_weight_leaf = self.min_weight_leaf
         cdef SIZE_t min_samples_split = self.min_samples_split
 
         # Recursive partition (without actual recursion)
@@ -217,8 +215,7 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
                 splitter.node_reset(start, end, &weighted_n_node_samples)
 
                 is_leaf = (depth >= max_depth or
-                           n_node_samples < min_samples_split or
-                           weighted_n_node_samples < 2 * min_weight_leaf)
+                           n_node_samples < min_samples_split)
 
                 if first:
                     impurity = splitter.node_impurity()
