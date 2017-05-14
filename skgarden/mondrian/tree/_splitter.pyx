@@ -45,7 +45,7 @@ cdef class Splitter:
     sparse and dense data, one split at a time.
     """
 
-    def __cinit__(self, Criterion criterion, object random_state, bint presort):
+    def __cinit__(self, Criterion criterion, object random_state):
         """
         Parameters
         ----------
@@ -69,7 +69,6 @@ cdef class Splitter:
         self.sample_weight = NULL
 
         self.random_state = random_state
-        self.presort = presort
 
     def __dealloc__(self):
         """Destructor."""
@@ -221,7 +220,7 @@ cdef class BaseDenseSplitter(Splitter):
     cdef SIZE_t n_total_samples
     cdef SIZE_t* sample_mask
 
-    def __cinit__(self, Criterion criterion, object random_state, bint presort):
+    def __cinit__(self, Criterion criterion, object random_state):
 
         self.X = NULL
         self.X_sample_stride = 0
@@ -229,12 +228,6 @@ cdef class BaseDenseSplitter(Splitter):
         self.X_idx_sorted_ptr = NULL
         self.X_idx_sorted_stride = 0
         self.sample_mask = NULL
-        self.presort = presort
-
-    def __dealloc__(self):
-        """Destructor."""
-        if self.presort == 1:
-            free(self.sample_mask)
 
     cdef int init(self,
                   object X,
@@ -256,17 +249,6 @@ cdef class BaseDenseSplitter(Splitter):
         self.X = <DTYPE_t*> X_ndarray.data
         self.X_sample_stride = <SIZE_t> X.strides[0] / <SIZE_t> X.itemsize
         self.X_feature_stride = <SIZE_t> X.strides[1] / <SIZE_t> X.itemsize
-
-        if self.presort == 1:
-            self.X_idx_sorted = X_idx_sorted
-            self.X_idx_sorted_ptr = <INT32_t*> self.X_idx_sorted.data
-            self.X_idx_sorted_stride = (<SIZE_t> self.X_idx_sorted.strides[1] /
-                                        <SIZE_t> self.X_idx_sorted.itemsize)
-
-            self.n_total_samples = X.shape[0]
-            safe_realloc(&self.sample_mask, self.n_total_samples)
-            memset(self.sample_mask, 0, self.n_total_samples*sizeof(SIZE_t))
-
         return 0
 
 
@@ -279,8 +261,7 @@ cdef class MondrianSplitter(BaseDenseSplitter):
 
     def __reduce__(self):
         return (MondrianSplitter, (self.criterion,
-                                   self.random_state,
-                                   self.presort), self.__getstate__())
+                                   self.random_state), self.__getstate__())
 
     cdef void set_bounds(self) nogil:
         """Sets lower bounds and upper bounds of every feature."""

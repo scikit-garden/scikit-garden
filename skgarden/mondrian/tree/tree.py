@@ -80,15 +80,13 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
                  max_depth,
                  min_samples_split,
                  random_state,
-                 class_weight=None,
-                 presort=False):
+                 class_weight=None):
         self.criterion = criterion
         self.splitter = splitter
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.random_state = random_state
         self.class_weight = class_weight
-        self.presort = presort
 
     def fit(self, X, y, sample_weight=None, check_input=True,
             X_idx_sorted=None):
@@ -188,33 +186,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
             else:
                 sample_weight = expanded_class_weight
 
-        presort = self.presort
-        # Allow presort to be 'auto', which means True if the dataset is dense,
-        # otherwise it will be False.
-        if self.presort == 'auto' and issparse(X):
-            presort = False
-        elif self.presort == 'auto':
-            presort = True
-
-        if presort is True and issparse(X):
-            raise ValueError("Presorting is not supported for sparse "
-                             "matrices.")
-
-        # If multiple trees are built on the same dataset, we only want to
-        # presort once. Splitters now can accept presorted indices if desired,
-        # but do not handle any presorting themselves. Ensemble algorithms
-        # which desire presorting must do presorting themselves and pass that
-        # matrix into each tree.
-        if X_idx_sorted is None and presort:
-            X_idx_sorted = np.asfortranarray(np.argsort(X, axis=0),
-                                             dtype=np.int32)
-
-        if presort and X_idx_sorted.shape != X.shape:
-            raise ValueError("The shape of X (X.shape = {}) doesn't match "
-                             "the shape of X_idx_sorted (X_idx_sorted"
-                             ".shape = {})".format(X.shape,
-                                                   X_idx_sorted.shape))
-
         # Build tree
         criterion = self.criterion
         if not isinstance(criterion, Criterion):
@@ -227,8 +198,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         splitter = self.splitter
         if not isinstance(self.splitter, Splitter):
             splitter = SPLITTERS[self.splitter](criterion,
-                                                random_state,
-                                                self.presort)
+                                                random_state)
 
         self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
 
@@ -457,8 +427,7 @@ class MondrianTreeRegressor(BaseMondrianTree, RegressorMixin):
             splitter="mondrian",
             max_depth=max_depth,
             min_samples_split=min_samples_split,
-            random_state=random_state,
-            presort=False)
+            random_state=random_state)
 
 
 class MondrianTreeClassifier(BaseMondrianTree, ClassifierMixin):
@@ -471,8 +440,7 @@ class MondrianTreeClassifier(BaseMondrianTree, ClassifierMixin):
             splitter="mondrian",
             max_depth=max_depth,
             min_samples_split=min_samples_split,
-            random_state=random_state,
-            presort=False)
+            random_state=random_state)
 
     def predict_proba(self, X, check_input=True):
         """
