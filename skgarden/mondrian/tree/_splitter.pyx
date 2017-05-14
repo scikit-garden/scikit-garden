@@ -45,17 +45,12 @@ cdef class Splitter:
     sparse and dense data, one split at a time.
     """
 
-    def __cinit__(self, Criterion criterion, SIZE_t max_features,
-                  object random_state, bint presort):
+    def __cinit__(self, Criterion criterion, object random_state, bint presort):
         """
         Parameters
         ----------
         criterion : Criterion
             The criterion to measure the quality of a split.
-
-        max_features : SIZE_t
-            The maximal number of randomly selected features which can be
-            considered for a split.
 
         random_state : object
             The user inputted random state to be used for pseudo-randomness
@@ -73,7 +68,6 @@ cdef class Splitter:
         self.y_stride = 0
         self.sample_weight = NULL
 
-        self.max_features = max_features
         self.random_state = random_state
         self.presort = presort
 
@@ -227,8 +221,7 @@ cdef class BaseDenseSplitter(Splitter):
     cdef SIZE_t n_total_samples
     cdef SIZE_t* sample_mask
 
-    def __cinit__(self, Criterion criterion, SIZE_t max_features,
-                  object random_state, bint presort):
+    def __cinit__(self, Criterion criterion, object random_state, bint presort):
 
         self.X = NULL
         self.X_sample_stride = 0
@@ -286,7 +279,6 @@ cdef class MondrianSplitter(BaseDenseSplitter):
 
     def __reduce__(self):
         return (MondrianSplitter, (self.criterion,
-                                   self.max_features,
                                    self.random_state,
                                    self.presort), self.__getstate__())
 
@@ -362,7 +354,6 @@ cdef class MondrianSplitter(BaseDenseSplitter):
 
         cdef SIZE_t X_sample_stride = self.X_sample_stride
         cdef SIZE_t X_feature_stride = self.X_feature_stride
-        cdef SIZE_t max_features = self.max_features
         cdef UINT32_t* random_state = &self.rand_r_state
 
         cdef SIZE_t f_j

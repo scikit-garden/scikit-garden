@@ -79,7 +79,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
                  splitter,
                  max_depth,
                  min_samples_split,
-                 max_features,
                  max_leaf_nodes,
                  random_state,
                  class_weight=None,
@@ -88,7 +87,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         self.splitter = splitter
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
-        self.max_features = max_features
         self.random_state = random_state
         self.max_leaf_nodes = max_leaf_nodes
         self.class_weight = class_weight
@@ -168,40 +166,11 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
             min_samples_split = int(ceil(self.min_samples_split * n_samples))
             min_samples_split = max(2, min_samples_split)
 
-        if isinstance(self.max_features, six.string_types):
-            if self.max_features == "auto":
-                if is_classification:
-                    max_features = max(1, int(np.sqrt(self.n_features_)))
-                else:
-                    max_features = self.n_features_
-            elif self.max_features == "sqrt":
-                max_features = max(1, int(np.sqrt(self.n_features_)))
-            elif self.max_features == "log2":
-                max_features = max(1, int(np.log2(self.n_features_)))
-            else:
-                raise ValueError(
-                    'Invalid value for max_features. Allowed string '
-                    'values are "auto", "sqrt" or "log2".')
-        elif self.max_features is None:
-            max_features = self.n_features_
-        elif isinstance(self.max_features, (numbers.Integral, np.integer)):
-            max_features = self.max_features
-        else:  # float
-            if self.max_features > 0.0:
-                max_features = max(1,
-                                   int(self.max_features * self.n_features_))
-            else:
-                max_features = 0
-
-        self.max_features_ = max_features
-
         if len(y) != n_samples:
             raise ValueError("Number of labels=%d does not match "
                              "number of samples=%d" % (len(y), n_samples))
         if max_depth <= 0:
             raise ValueError("max_depth must be greater than zero. ")
-        if not (0 < max_features <= self.n_features_):
-            raise ValueError("max_features must be in (0, n_features]")
         if not isinstance(max_leaf_nodes, (numbers.Integral, np.integer)):
             raise ValueError("max_leaf_nodes must be integral number but was "
                              "%r" % max_leaf_nodes)
@@ -268,7 +237,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         splitter = self.splitter
         if not isinstance(self.splitter, Splitter):
             splitter = SPLITTERS[self.splitter](criterion,
-                                                self.max_features_,
                                                 random_state,
                                                 self.presort)
 
@@ -499,7 +467,6 @@ class MondrianTreeRegressor(BaseMondrianTree, RegressorMixin):
             splitter="mondrian",
             max_depth=max_depth,
             min_samples_split=min_samples_split,
-            max_features=None,
             random_state=random_state,
             max_leaf_nodes=None,
             presort=False)
@@ -515,7 +482,6 @@ class MondrianTreeClassifier(BaseMondrianTree, ClassifierMixin):
             splitter="mondrian",
             max_depth=max_depth,
             min_samples_split=min_samples_split,
-            max_features=None,
             random_state=random_state,
             max_leaf_nodes=None,
             presort=False)
