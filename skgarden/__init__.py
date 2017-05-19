@@ -9,9 +9,12 @@ from .quantile import ExtraTreeQuantileRegressor
 from .quantile import ExtraTreesQuantileRegressor
 from .quantile import RandomForestQuantileRegressor
 
+__version__ = "0.1"
+
 __all__ = [
     "MondrianTreeClassifier",
     "MondrianTreeRegressor",
+    "MondrianForestClassifier",
     "MondrianForestRegressor",
     "DecisionTreeQuantileRegressor",
     "ExtraTreesRegressor",

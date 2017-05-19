@@ -18,7 +18,7 @@ Scikit-Garden or skgarden (pronounced as skarden) is a garden for Scikit-Learn c
 Scikit-Garden depends on NumPy, SciPy, Scikit-Learn and Cython. So make sure these dependencies are installed using pip:
 
 ```
-pip3 install numpy scipy scikit-learn cython
+pip3 install setuptools numpy scipy scikit-learn cython
 ```
 
 After that Scikit-Garden can be installed like any other package.
