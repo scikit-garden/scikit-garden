@@ -12,7 +12,7 @@ DESCRIPTION = "A garden of scikit-learn compatible trees" + \
               "based on sklearn tree code."
 URL = 'https://github.com/scikit-garden/scikit-garden'
 LICENSE = 'new BSD'
-VERSION = '0.0.dev0'
+VERSION = '0.1'
 
 
 def configuration(parent_package='', top_path=None):
