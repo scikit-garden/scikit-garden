@@ -21,12 +21,10 @@ Scikit-Garden depends on NumPy, SciPy, Scikit-Learn and Cython. So make sure the
 pip3 install setuptools numpy scipy scikit-learn cython
 ```
 
-After that Scikit-Garden can be installed like any other package.
+After that Scikit-Garden can be installed using pip.
 
 ```
-git clone https://github.com/scikit-garden/scikit-garden
-cd scikit-garden
-python3 setup.py develop
+pip install scikit-garden
 ```
 
 ## Available models

@@ -4,28 +4,36 @@ Scikit-garden or skgarden (pronounced as skarden) is a garden for scikit-learn c
 
 ## Installation
 
-### Dependencies
-
-scikit-garden depends on NumPy, SciPy, scikit-learn and Cython. So make sure these dependencies are installed using pip
+Scikit-Garden depends on NumPy, SciPy, Scikit-Learn and Cython. So make sure these dependencies are installed using pip:
 
 ```
-pip3 install numpy scipy scikit-learn cython
+pip install setuptools numpy scipy scikit-learn cython
 ```
 
-After that scikit-garden can be installed like any other package.
+After that Scikit-Garden can be installed using pip.
 
 ```
-git clone https://github.com/scikit-garden/scikit-garden
-cd scikit-garden
-python3 setup.py install
+pip install scikit-garden
 ```
 
-and then you can do
+## Usage
+
+The estimators in Scikit-Garden are Scikit-Learn compatible and can serve as a drop-in replacement for Scikit-Learn's trees and forests.
 
 ```python
->>> import skgarden
+from sklearn.datasets import load_boston
+X, y = make_boston()
+
+### Use MondrianForests for variance estimation
+from skgarden import MondrianForestRegressor
+mfr = MondrianForestRegressor()
+mfr.fit(X, y)
+y_mean, y_std = mfr.predict(X, return_std=True)
+
+### Use QuantileForests for quantile estimation
+from skgarden import RandomForestQuantileRegressor
+rfqr = RandomForestQuantileRegressor(random_state=0)
+rfqr.fit(X, y)
+y_mean = rfqr.predict(X)
+y_median = rfqr.predict(X, 50)
 ```
-
-from anywhere outside the root directory.
-
-### Available models.
