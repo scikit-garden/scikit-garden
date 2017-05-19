@@ -318,9 +318,9 @@ if __name__ == '__main__':
 
     package = 'skgarden'
     subpackages = [
-        'forest',
         'mondrian',
-        'quantile']
+        'quantile',
+        'forest']
 
     curdir = op.dirname(op.realpath(__file__))
     path = op.join(os.getcwd(), 'docs/api.md')
