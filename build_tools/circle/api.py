@@ -253,7 +253,6 @@ def _generate_preamble(package, subpackages):
 
         # All public classes.
         for klass in _iter_classes(subpackage):
-
             # Class documentation.
             yield "* " + _link(_full_name(subpackage, klass))
 
@@ -319,6 +318,7 @@ if __name__ == '__main__':
 
     package = 'skgarden'
     subpackages = [
+        'forest',
         'mondrian',
         'quantile']
 
