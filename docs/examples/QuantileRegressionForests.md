@@ -102,6 +102,7 @@ mean = (upper + lower) / 2
 y_true_all -= mean
 upper -= mean
 lower -= mean
+```
 
 Plot the prediction intervals, the original target values. We see that most
 of the samples lie within the 95 p.c prediction interval.
