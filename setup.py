@@ -8,9 +8,9 @@ from numpy.distutils.core import setup
 from setuptools import find_packages
 
 DISTNAME = 'scikit-garden'
-DESCRIPTION = "Implementation of mondrian_forest " + \
+DESCRIPTION = "A garden of scikit-learn compatible trees" + \
               "based on sklearn tree code."
-URL = 'https://github.com/scikit-optimize/mondrian_forest'
+URL = 'https://github.com/scikit-garden/scikit-garden'
 LICENSE = 'new BSD'
 VERSION = '0.0.dev0'
 

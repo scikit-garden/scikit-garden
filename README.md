@@ -3,3 +3,65 @@
 [![Build
 Status](https://travis-ci.org/scikit-garden/scikit-garden.svg?branch=master)](https://travis-ci.org/scikit-garden/scikit-garden)
 [![Build Status](https://circleci.com/gh/scikit-garden/scikit-garden/tree/master.svg?style=shield&circle-token=:circle-token)](https://circleci.com/gh/scikit-garden/scikit-garden)
+
+Scikit-garden or skgarden (pronounced as skarden) is a garden for scikit-learn compatible trees (and forests).
+
+<img src="docs/mondrian_tree/plot3.png" height="300" />
+
+<img src="docs/quantile/boston.png" height="300" />
+
+
+## Installation
+
+Scikit-garden depends on NumPy, SciPy, scikit-learn and Cython. So make sure these dependencies are installed using pip
+
+```
+pip3 install numpy scipy scikit-learn cython
+```
+
+After that scikit-garden can be installed like any other package.
+
+```
+git clone https://github.com/scikit-garden/scikit-garden
+cd scikit-garden
+python3 setup.py develop
+```
+
+## Available models
+
+### Regressors
+* MondrianTreeRegressor
+* MondrianForestRegressor
+* ExtraTreeQuantileRegressor
+* ExtraTreesQuantileRegressor
+* RandomForestQuantileRegressor
+* RandomForestQuantileRegressor
+
+### Classifiers
+* MondrianTreeClassifier
+* MondrianForestClassifier
+
+## Usage
+The estimators in scikit-garden are scikit-learn compatible and can serve as a drop-in replacement for scikit-learn's trees and forests.
+
+```python
+from sklearn.datasets import load_boston
+X, y = make_boston()
+
+### Use MondrianForests for variance estimation
+from skgarden import MondrianForestRegressor
+mfr = MondrianForestRegressor()
+mfr.fit(X, y)
+y_mean, y_std = mfr.predict(X, return_std=True)
+
+### Use QuantileForests for quantile estimation
+from skgarden import RandomForestQuantileRegressor
+rfqr = RandomForestQuantileRegressor(random_state=0)
+rfqr.fit(X, y)
+y_mean = rfqr.predict(X)
+y_median = rfqr.predict(X, 50)
+```
+
+## Important links
+-  API Reference - https://scikit-garden.github.io/api/
+-  Examples -https://scikit-garden.github.io/examples/
