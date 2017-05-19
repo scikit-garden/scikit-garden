@@ -8,9 +8,10 @@ from numpy.distutils.core import setup
 from setuptools import find_packages
 
 DISTNAME = 'scikit-garden'
-DESCRIPTION = "A garden of scikit-learn compatible trees" + \
-              "based on sklearn tree code."
+DESCRIPTION = "A garden of scikit-learn compatible trees"
 URL = 'https://github.com/scikit-garden/scikit-garden'
+MAINTAINER = 'Manoj Kumar'
+MAINTAINER_EMAIL = 'mks542@nyu.edu'
 LICENSE = 'new BSD'
 VERSION = '0.1'
 
@@ -34,6 +35,8 @@ if __name__ == "__main__":
     sys.path.insert(0, local_path)
     setup(configuration=configuration,
           name=DISTNAME,
+          maintainer=MAINTAINER,
+          maintainer_email=MAINTAINER_EMAIL,
           packages=find_packages(),
           include_package_data=True,
           description=DESCRIPTION,
