@@ -29,6 +29,7 @@ from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
 from sklearn.base import RegressorMixin
 from sklearn.externals import six
+from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
 from sklearn.utils import compute_sample_weight
 from sklearn.utils.multiclass import check_classification_targets
@@ -90,7 +91,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
 
     def fit(self, X, y, sample_weight=None, check_input=True,
             X_idx_sorted=None):
-
         random_state = check_random_state(self.random_state)
         if check_input:
             X, y = check_X_y(X, y, dtype=DTYPE, multi_output=False)
@@ -199,9 +199,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         if not isinstance(self.splitter, Splitter):
             splitter = SPLITTERS[self.splitter](criterion,
                                                 random_state)
-
         self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
-
         builder = DepthFirstTreeBuilder(splitter, min_samples_split,
                                         max_depth)
         builder.build(self.tree_, X, y, sample_weight, X_idx_sorted)
@@ -329,6 +327,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         X = self._validate_X_predict(X, check_input)
         return self.tree_.decision_path(X)
 
+
 class BaseMondrianTree(BaseDecisionTree):
     """A Mondrian tree.
 
@@ -375,6 +374,34 @@ class BaseMondrianTree(BaseDecisionTree):
         If None, the random number generator is the RandomState instance used
         by `np.random`.
     """
+    def partial_fit(self, X, y, classes=None):
+        X, y = check_X_y(X, y, dtype=DTYPE, multi_output=False)
+        is_classifier = isinstance(self, ClassifierMixin)
+        random_state = check_random_state(self.random_state)
+
+        if is_classifier:
+            check_classification_targets(y)
+
+            # partial_fit first call
+            if not hasattr(self, "le_"):
+                if len(y) == 1:
+                    raise ValueError("Unable to infer classes. Should be "
+                                     "provided at the first call to partial_fit.")
+                self.le_ = LabelEncoder()
+                if classes is not None:
+                    self.le_.fit(classes)
+                else:
+                    self.le_.fit(y)
+            y_enc = self.le_.transform(y)
+            n_classes = [len(self.le_.classes_)]
+        else:
+            n_classes = [1]
+
+        self.n_features_ = X.shape[1]
+        self.n_classes_ = np.array(n_classes, dtype=np.intp)
+        self.n_outputs_ = 1
+        self.tree_ = Tree(self,n_features_, self.n_classes_, self.n_outputs_)
+        return self
 
     def weighted_decision_path(self, X, check_input=True):
         """
