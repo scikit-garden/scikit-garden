@@ -329,19 +329,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         X = self._validate_X_predict(X, check_input)
         return self.tree_.decision_path(X)
 
-    @property
-    def feature_importances_(self):
-        """Return the feature importances.
-        The importance of a feature is computed as the (normalized) total
-        reduction of the criterion brought by that feature.
-        It is also known as the Gini importance.
-        Returns
-        -------
-        feature_importances_ : array, shape = [n_features]
-        """
-        check_is_fitted(self, 'tree_')
-        return self.tree_.compute_feature_importances()
-
 class BaseMondrianTree(BaseDecisionTree):
     """A Mondrian tree.
 
