@@ -69,10 +69,9 @@ cdef SIZE_t INITIAL_STACK_SIZE = 10
 # Repeat struct definition for numpy
 NODE_DTYPE = np.dtype({
     'names': ['left_child', 'right_child', 'feature', 'threshold', 'impurity',
-              'n_node_samples', 'weighted_n_node_samples', 'tau', 'mean',
-              'variance'],
+              'n_node_samples', 'weighted_n_node_samples', 'tau', 'variance'],
     'formats': [np.intp, np.intp, np.intp, np.float64, np.float64, np.intp,
-                np.float64, np.float32, np.float64, np.float64],
+                np.float64, np.float32, np.float64],
     'offsets': [
         <Py_ssize_t> &(<Node*> NULL).left_child,
         <Py_ssize_t> &(<Node*> NULL).right_child,
@@ -82,7 +81,6 @@ NODE_DTYPE = np.dtype({
         <Py_ssize_t> &(<Node*> NULL).n_node_samples,
         <Py_ssize_t> &(<Node*> NULL).weighted_n_node_samples,
         <Py_ssize_t> &(<Node*> NULL).tau,
-        <Py_ssize_t> &(<Node*> NULL).mean,
         <Py_ssize_t> &(<Node*> NULL).variance,
     ]
 })

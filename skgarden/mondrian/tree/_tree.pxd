@@ -35,7 +35,6 @@ cdef struct Node:
     DTYPE_t* lower_bounds                # Lower bounds of all features at current node.
     DTYPE_t* upper_bounds                # Upper bounds of all features at current node.
     DTYPE_t tau                          # Time of split.
-    DOUBLE_t mean                        # Emprical mean of the node.
     DOUBLE_t variance                    # Emprical variance of the node.
 
 
