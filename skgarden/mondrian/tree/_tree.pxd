@@ -82,7 +82,7 @@ cdef class Tree:
     cpdef object weighted_decision_path(self, object X)
     cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_stride)
     cdef void extend(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t x_start,
-                     SIZE_t X_f_stride, SIZE_t y_stride)
+                     SIZE_t X_f_stride, SIZE_t y_stride, UINT32_t random_state)
 
 
 # =============================================================================
@@ -103,6 +103,7 @@ cdef class TreeBuilder:
     cdef SIZE_t min_samples_leaf    # Minimum number of samples in a leaf
     cdef double min_weight_leaf     # Minimum weight in a leaf
     cdef SIZE_t max_depth           # Maximal tree depth
+    cdef object random_state
 
     cpdef build(self, Tree tree, object X, np.ndarray y,
                 np.ndarray sample_weight=*,

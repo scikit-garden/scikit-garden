@@ -376,6 +376,7 @@ class BaseMondrianTree(BaseDecisionTree):
         by `np.random`.
     """
     def partial_fit(self, X, y, classes=None):
+        random_state = check_random_state(self.random_state)
         X, y = check_X_y(X, y, dtype=DTYPE, multi_output=False)
         is_classifier = isinstance(self, ClassifierMixin)
         random_state = check_random_state(self.random_state)
@@ -407,7 +408,8 @@ class BaseMondrianTree(BaseDecisionTree):
         self.n_classes_ = np.array(n_classes, dtype=np.intp)
         self.n_outputs_ = 1
         self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
-        builder = PartialFitTreeBuilder(self.min_samples_split, max_depth)
+        builder = PartialFitTreeBuilder(
+            self.min_samples_split, max_depth, random_state)
         builder.build(self.tree_, X, y)
         return self
 

@@ -31,10 +31,13 @@ np.import_array()
 from scipy.sparse import csc_matrix
 
 from ._utils cimport log
+from ._utils cimport rand_exponential
 from ._utils cimport rand_int
+from ._utils cimport rand_multinomial
 from ._utils cimport rand_uniform
 from ._utils cimport RAND_R_MAX
 from ._utils cimport safe_realloc
+
 
 cdef double INFINITY = np.inf
 
@@ -359,19 +362,9 @@ cdef class MondrianSplitter(BaseDenseSplitter):
                 cum_diff[f_j] += cum_diff[f_j - 1]
             rate += (upper_bound - lower_bound)
 
-        # Sample time of split to be -ln(U) / rate.
-        split.E = -ln(rand_uniform(0.0, 1.0, random_state)) / rate
-
+        split.E = rand_exponential(rate, random_state)
         # Sample dimension delta with a probability proportional to (u_d - l_d)
-        search = rand_uniform(0.0, cum_diff[n_features-1], random_state)
-        for f_j in range(n_features):
-            if f_j == 0:
-                lower_bound = 0.0
-            else:
-                lower_bound = cum_diff[f_j - 1]
-            if cum_diff[f_j] >= search and lower_bound < search:
-                split.feature = f_j
-                break
+        split.feature = rand_multinomial(cum_diff, n_features, random_state)
 
         # Sample location xi uniformly between (l_d[delta], u_d[delta])
         split.threshold = rand_uniform(

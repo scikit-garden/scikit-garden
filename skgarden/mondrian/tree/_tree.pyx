@@ -36,6 +36,10 @@ from ._utils cimport Stack
 from ._utils cimport StackRecord
 from ._utils cimport safe_realloc
 from ._utils cimport sizet_ptr_to_ndarray
+from ._utils cimport rand_exponential
+from ._utils cimport rand_multinomial
+from ._utils cimport rand_uniform
+from ._utils cimport RAND_R_MAX
 
 cdef extern from "numpy/arrayobject.h":
     object PyArray_NewFromDescr(object subtype, np.dtype descr,
@@ -117,15 +121,18 @@ cdef class TreeBuilder:
 cdef class PartialFitTreeBuilder(TreeBuilder):
     """Build a decision tree incrementally."""
 
-    def __cinit__(self, SIZE_t min_samples_split, SIZE_t max_depth):
+    def __cinit__(self, SIZE_t min_samples_split, SIZE_t max_depth,
+                  object random_state):
         self.min_samples_split = min_samples_split
         self.max_depth = max_depth
+        self.random_state = random_state
 
     cpdef build(self, Tree tree, object X, np.ndarray y,
                 np.ndarray sample_weight=None,
                 np.ndarray X_idx_sorted=None):
         X, y, sample_weight = self._check_input(X, y, None)
 
+        cdef UINT32_t rand_r_state = self.random_state.randint(0, RAND_R_MAX)
         cdef int n_samples = X.shape[0]
         cdef int init_capacity
         if tree.max_depth <= 10:
@@ -151,7 +158,8 @@ cdef class PartialFitTreeBuilder(TreeBuilder):
             start = 0
 
         for i in range(start, n_samples):
-            tree.extend(X_ptr, y_ptr, i*X_s_stride, X_f_stride, y_stride)
+            tree.extend(X_ptr, y_ptr, i*X_s_stride, X_f_stride,
+                        y_stride, rand_r_state)
 
 # Depth first builder ---------------------------------------------------------
 
@@ -547,23 +555,41 @@ cdef class Tree:
         self.node_count += 1
 
     cdef void extend(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_start,
-                     SIZE_t X_f_stride, SIZE_t y_stride):
+                     SIZE_t X_f_stride, SIZE_t y_stride, UINT32_t random_state):
         # Traverse the tree
         cdef Node* node = &self.nodes[0]
         cdef SIZE_t f_ind
         cdef DTYPE_t x
-        cdef DTYPE_t E
+        cdef DTYPE_t rate
         cdef DTYPE_t* e_l = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
         cdef DTYPE_t* e_u = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+        cdef DTYPE_t* extent = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+        cdef DTYPE_t E
+        cdef SIZE_t feature
+        cdef double threshold
+        cdef double l_b
+        cdef double u_b
 
         while True:
-            E = 0.0
+            rate = 0.0
             for f_ind in range(self.n_features):
                 x = X_ptr[X_start + f_ind * X_f_stride]
                 e_l[f_ind] = fmax(node.lower_bounds[f_ind] - x, 0)
                 e_u[f_ind] = fmax(x - node.upper_bounds[f_ind], 0)
-                E += e_l[f_ind] + e_u[f_ind]
-            print(E)
+                extent[f_ind] = e_l[f_ind] + e_u[f_ind]
+                rate += extent[f_ind]
+            E = rand_exponential(rate, &random_state)
+            feature = rand_multinomial(extent, self.n_features, &random_state)
+
+            x = X_ptr[X_start + feature * X_f_stride]
+            if x < e_l[feature]:
+                l_b = x
+                u_b = e_l[feature]
+            else:
+                l_b = e_u[feature]
+                u_b = x
+            threshold = rand_uniform(l_b, u_b, &random_state)
+            print(threshold)
             if node.left_child == _TREE_LEAF:
                 break
         free(e_l)
