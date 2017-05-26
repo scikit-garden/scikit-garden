@@ -80,7 +80,10 @@ cdef class Tree:
     cpdef object decision_path(self, object X)
     cdef object _decision_path_dense(self, object X)
     cpdef object weighted_decision_path(self, object X)
-
+    cpdef void _partial_fit(self, np.ndarray[DTYPE_t, ndim=2] X,
+                           np.ndarray[DOUBLE_t, ndim=2] y)
+    cdef int _insert_X(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr,
+                       SIZE_t X_start, SIZE_t y_start)
 
 # =============================================================================
 # Tree builder

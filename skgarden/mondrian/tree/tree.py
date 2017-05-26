@@ -392,15 +392,18 @@ class BaseMondrianTree(BaseDecisionTree):
                     self.le_.fit(classes)
                 else:
                     self.le_.fit(y)
-            y_enc = self.le_.transform(y)
+            y = self.le_.transform(y)
             n_classes = [len(self.le_.classes_)]
         else:
             n_classes = [1]
 
+        y = np.array(y, dtype=np.float64)
+        y = np.reshape(y, (-1, 1))
         self.n_features_ = X.shape[1]
         self.n_classes_ = np.array(n_classes, dtype=np.intp)
         self.n_outputs_ = 1
-        self.tree_ = Tree(self,n_features_, self.n_classes_, self.n_outputs_)
+        self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
+        self.tree_._partial_fit(X, y)
         return self
 
     def weighted_decision_path(self, X, check_input=True):
