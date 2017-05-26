@@ -80,7 +80,10 @@ cdef class Tree:
     cpdef object decision_path(self, object X)
     cdef object _decision_path_dense(self, object X)
     cpdef object weighted_decision_path(self, object X)
-    cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr)
+    cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_stride)
+    cdef void extend(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t x_start,
+                     SIZE_t X_f_stride, SIZE_t y_stride)
+
 
 # =============================================================================
 # Tree builder

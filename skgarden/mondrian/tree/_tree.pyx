@@ -136,14 +136,22 @@ cdef class PartialFitTreeBuilder(TreeBuilder):
 
         cdef np.ndarray X_ndarray = X
         cdef DTYPE_t* X_ptr = <DTYPE_t*> X_ndarray.data
-        cdef SIZE_t X_sample_stride = X.strides[0] / X.itemsize
-        cdef SIZE_t X_feature_stride = X.strides[1] / X.itemsize
+        cdef SIZE_t X_s_stride = X.strides[0] / X.itemsize
+        cdef SIZE_t X_f_stride = X.strides[1] / X.itemsize
         cdef DOUBLE_t* y_ptr = <DOUBLE_t*> y.data
-        cdef SIZE_t y_sample_stride = y.strides[0] / y.itemsize
+        cdef SIZE_t y_stride = y.strides[0] / y.itemsize
+        cdef SIZE_t sample_ind
+        cdef SIZE_t start
+        cdef Node* node
 
         if tree.node_count == 0:
-            tree._init(X_ptr, y_ptr)
+            tree._init(X_ptr, y_ptr, X_f_stride)
+            start = 1
+        else:
+            start = 0
 
+        for i in range(start, n_samples):
+            tree.extend(X_ptr, y_ptr, i*X_s_stride, X_f_stride, y_stride)
 
 # Depth first builder ---------------------------------------------------------
 
@@ -512,7 +520,7 @@ cdef class Tree:
         self.capacity = capacity
         return 0
 
-    cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr):
+    cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_f_stride):
         cdef Node* node = &self.nodes[0]
         cdef SIZE_t f_ind
 
@@ -529,7 +537,7 @@ cdef class Tree:
         node.upper_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
 
         for f_ind in range(self.n_features):
-            node.lower_bounds[f_ind] = node.upper_bounds[f_ind] = X_ptr[f_ind]
+            node.lower_bounds[f_ind] = node.upper_bounds[f_ind] = X_ptr[X_f_stride * f_ind]
 
         # Regression
         if self.n_classes[0] == 1:
@@ -537,6 +545,29 @@ cdef class Tree:
         else:
             self.value[<SIZE_t> y_ptr[0]] = 1.0
         self.node_count += 1
+
+    cdef void extend(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_start,
+                     SIZE_t X_f_stride, SIZE_t y_stride):
+        # Traverse the tree
+        cdef Node* node = &self.nodes[0]
+        cdef SIZE_t f_ind
+        cdef DTYPE_t x
+        cdef DTYPE_t E
+        cdef DTYPE_t* e_l = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+        cdef DTYPE_t* e_u = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+
+        while True:
+            E = 0.0
+            for f_ind in range(self.n_features):
+                x = X_ptr[X_start + f_ind * X_f_stride]
+                e_l[f_ind] = fmax(node.lower_bounds[f_ind] - x, 0)
+                e_u[f_ind] = fmax(x - node.upper_bounds[f_ind], 0)
+                E += e_l[f_ind] + e_u[f_ind]
+            print(E)
+            if node.left_child == _TREE_LEAF:
+                break
+        free(e_l)
+        free(e_u)
 
     cdef SIZE_t _add_node(self, SIZE_t parent, bint is_left, bint is_leaf,
                           SIZE_t feature, double threshold, double impurity,
