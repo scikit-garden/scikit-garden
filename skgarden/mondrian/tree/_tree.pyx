@@ -126,6 +126,24 @@ cdef class PartialFitTreeBuilder(TreeBuilder):
                 np.ndarray X_idx_sorted=None):
         X, y, sample_weight = self._check_input(X, y, None)
 
+        cdef int n_samples = X.shape[0]
+        cdef int init_capacity
+        if tree.max_depth <= 10:
+            init_capacity = (2 ** (tree.max_depth + 1)) - 1
+        else:
+            init_capacity = 2047
+        tree._resize(init_capacity)
+
+        cdef np.ndarray X_ndarray = X
+        cdef DTYPE_t* X_ptr = <DTYPE_t*> X_ndarray.data
+        cdef SIZE_t X_sample_stride = X.strides[0] / X.itemsize
+        cdef SIZE_t X_feature_stride = X.strides[1] / X.itemsize
+        cdef DOUBLE_t* y_ptr = <DOUBLE_t*> y.data
+        cdef SIZE_t y_sample_stride = y.strides[0] / y.itemsize
+
+        if tree.node_count == 0:
+            tree._init(X_ptr, y_ptr)
+
 
 # Depth first builder ---------------------------------------------------------
 
@@ -152,12 +170,10 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
 
         # Initial capacity
         cdef int init_capacity
-
         if tree.max_depth <= 10:
             init_capacity = (2 ** (tree.max_depth + 1)) - 1
         else:
             init_capacity = 2047
-
         tree._resize(init_capacity)
 
         # Parameters
@@ -374,6 +390,7 @@ cdef class Tree:
         def __get__(self):
             return self._get_node_ndarray()["variance"][:self.node_count]
 
+
     def __cinit__(self, int n_features, np.ndarray[SIZE_t, ndim=1] n_classes,
                   int n_outputs):
         """Constructor."""
@@ -494,6 +511,32 @@ cdef class Tree:
 
         self.capacity = capacity
         return 0
+
+    cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr):
+        cdef Node* node = &self.nodes[0]
+        cdef SIZE_t f_ind
+
+        node.left_child = _TREE_LEAF
+        node.right_child = _TREE_LEAF
+        node.feature = _TREE_UNDEFINED
+        node.threshold = _TREE_UNDEFINED
+        node.tau = INFINITY
+        node.n_node_samples = node.weighted_n_node_samples = 1
+        node.impurity = 0.0
+        node.variance = 0.0
+
+        node.lower_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+        node.upper_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+
+        for f_ind in range(self.n_features):
+            node.lower_bounds[f_ind] = node.upper_bounds[f_ind] = X_ptr[f_ind]
+
+        # Regression
+        if self.n_classes[0] == 1:
+            self.value[0] = y_ptr[0]
+        else:
+            self.value[<SIZE_t> y_ptr[0]] = 1.0
+        self.node_count += 1
 
     cdef SIZE_t _add_node(self, SIZE_t parent, bint is_left, bint is_leaf,
                           SIZE_t feature, double threshold, double impurity,

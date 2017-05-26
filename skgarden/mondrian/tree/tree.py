@@ -379,6 +379,8 @@ class BaseMondrianTree(BaseDecisionTree):
         X, y = check_X_y(X, y, dtype=DTYPE, multi_output=False)
         is_classifier = isinstance(self, ClassifierMixin)
         random_state = check_random_state(self.random_state)
+        max_depth = ((2 ** 31) - 1 if self.max_depth is None
+                     else self.max_depth)
 
         if is_classifier:
             check_classification_targets(y)
@@ -405,8 +407,7 @@ class BaseMondrianTree(BaseDecisionTree):
         self.n_classes_ = np.array(n_classes, dtype=np.intp)
         self.n_outputs_ = 1
         self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
-        builder = PartialFitTreeBuilder(
-            self.min_samples_split, self.max_depth)
+        builder = PartialFitTreeBuilder(self.min_samples_split, max_depth)
         builder.build(self.tree_, X, y)
         return self
 
