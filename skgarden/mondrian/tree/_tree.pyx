@@ -121,7 +121,9 @@ cdef class PartialFitTreeBuilder(TreeBuilder):
         self.min_samples_split = min_samples_split
         self.max_depth = max_depth
 
-    cpdef build(self, Tree tree, object X, np.ndarray y):
+    cpdef build(self, Tree tree, object X, np.ndarray y,
+                np.ndarray sample_weight=None,
+                np.ndarray X_idx_sorted=None):
         X, y, sample_weight = self._check_input(X, y, None)
 
 
@@ -492,45 +494,6 @@ cdef class Tree:
 
         self.capacity = capacity
         return 0
-
-    cpdef void _partial_fit(self, np.ndarray[DTYPE_t, ndim=2] X,
-                            np.ndarray[DOUBLE_t, ndim=2] y):
-        cdef DTYPE_t* X_ptr = <DTYPE_t*> X.data
-        cdef SIZE_t X_sample_stride = <SIZE_t> X.strides[0] / <SIZE_t> X.itemsize
-        cdef SIZE_t X_fx_stride = <SIZE_t> X.strides[1] / <SIZE_t> X.itemsize
-        cdef SIZE_t n_samples = X.shape[0]
-        cdef DOUBLE_t* y_ptr = <DOUBLE_t*> y.data
-        cdef SIZE_t y_stride = <SIZE_t> y.strides[0] / <SIZE_t> y.itemsize
-        cdef SIZE_t i
-        for i in range(n_samples):
-            self._insert_X(X_ptr, y_ptr, i*X_sample_stride, i*y_stride)
-            break
-
-    cdef int _insert_X(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr,
-                        SIZE_t X_start, SIZE_t y_start):
-        cdef SIZE_t node_id = self.node_count
-        cdef Node* node = &self.nodes[node_id]
-        cdef SIZE_t f_ind
-
-        if node_id >= self.capacity:
-            if self._resize_c() != 0:
-                return <SIZE_t>(-1)
-        print(node_id)
-        # node.impurity = 0.0
-        # node.lower_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
-        # node.upper_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
-        return 0
-        # if self.node_count == 0:
-        #     node.left_child = _TREE_LEAF
-        #     node.right_child = _TREE_LEAF
-        #     node.feature = _TREE_UNDEFINED
-        #     node.threshold = _TREE_UNDEFINED
-        #     node.n_node_samples = node.weighted_n_node_samples = 1
-        #     node.tau = INFINITY
-        #     node.variance = INFINITY
-            # for f_ind in range(self.n_features):
-            #     node.lower_bounds[f_ind] = node.upper_bounds[f_ind] = X_ptr[X_start + f_ind]
-
 
     cdef SIZE_t _add_node(self, SIZE_t parent, bint is_left, bint is_leaf,
                           SIZE_t feature, double threshold, double impurity,

@@ -41,6 +41,7 @@ from sklearn.exceptions import NotFittedError
 from ._criterion import Criterion
 from ._splitter import Splitter
 from ._tree import DepthFirstTreeBuilder
+from ._tree import PartialFitTreeBuilder
 from ._tree import Tree
 from . import _tree, _splitter, _criterion
 
@@ -397,13 +398,16 @@ class BaseMondrianTree(BaseDecisionTree):
         else:
             n_classes = [1]
 
+        # To be consistent with sklearns tree architecture, we reshape.
         y = np.array(y, dtype=np.float64)
         y = np.reshape(y, (-1, 1))
         self.n_features_ = X.shape[1]
         self.n_classes_ = np.array(n_classes, dtype=np.intp)
         self.n_outputs_ = 1
         self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
-        self.tree_._partial_fit(X, y)
+        builder = PartialFitTreeBuilder(
+            self.min_samples_split, self.max_depth)
+        builder.build(self.tree_, X, y)
         return self
 
     def weighted_decision_path(self, X, check_input=True):
