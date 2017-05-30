@@ -13,7 +13,7 @@ URL = 'https://github.com/scikit-garden/scikit-garden'
 MAINTAINER = 'Manoj Kumar'
 MAINTAINER_EMAIL = 'mks542@nyu.edu'
 LICENSE = 'new BSD'
-VERSION = '0.2dev'
+VERSION = '0.1.2'
 
 
 def configuration(parent_package='', top_path=None):
