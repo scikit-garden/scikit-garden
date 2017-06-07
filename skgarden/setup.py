@@ -7,6 +7,7 @@ from numpy.distutils.misc_util import Configuration
 def configuration(parent_package="", top_path=None):
     config = Configuration("skgarden", parent_package, top_path)
     config.add_subpackage("mondrian")
+    config.add_subpackage("quantile")
     libraries = []
     if os.name == 'posix':
         libraries.append('m')
