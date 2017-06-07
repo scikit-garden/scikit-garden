@@ -304,6 +304,8 @@ the leaf in making predictions. It takes into account the entire path from the r
 [http://scikit-learn.org/](http://scikit-learn.org/)
 3. Understanding Random Forests, Gilles Louppe
 [https://arxiv.org/abs/1407.7502](https://arxiv.org/abs/1407.7502)
+4.  Mondrian Forests: Efficient Online Random Forests, Balaji Lakshminarayanan, Daniel M. Roy, Yee Whye Teh
+[https://arxiv.org/abs/1406.2673](https://arxiv.org/abs/1406.2673)
 
 ### Acknowledgements
 This tutorial mainly arises from discussions with Gilles Louppe and Balaji Lakshminarayanan for which I am hugely grateful.
