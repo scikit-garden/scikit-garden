@@ -388,7 +388,7 @@ class BaseMondrianTree(BaseDecisionTree):
 
             # partial_fit first call
             if not hasattr(self, "le_"):
-                if len(y) == 1:
+                if len(y) == 1 and classes is None:
                     raise ValueError("Unable to infer classes. Should be "
                                      "provided at the first call to partial_fit.")
                 self.le_ = LabelEncoder()

@@ -410,3 +410,17 @@ def test_tree_attributes():
     mr = MondrianTreeRegressor(random_state=0)
     mr.fit(X, y)
     check_tree_attributes(X, y, 0, mr.tree_)
+
+
+def test_partial_fit_one_sample():
+    rng = np.random.RandomState(0)
+    X = rng.randn(1, 5)
+    y = [4.5]
+    mtr = MondrianTreeRegressor(random_state=0)
+    mtr.partial_fit(X, y)
+    assert_array_equal(mtr.tree_.value, [[[4.5]]])
+
+    y = [1]
+    mtr = MondrianTreeClassifier(random_state=0)
+    mtr.partial_fit(X, y, classes=[0, 1])
+    assert_array_equal(mtr.tree_.value, [[[ 0.,  1.]]])

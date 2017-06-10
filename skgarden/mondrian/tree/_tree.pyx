@@ -134,6 +134,7 @@ cdef class PartialFitTreeBuilder(TreeBuilder):
 
         cdef UINT32_t rand_r_state = self.random_state.randint(0, RAND_R_MAX)
         cdef int n_samples = X.shape[0]
+        cdef int n_features = X.shape[1]
         cdef int init_capacity
         if tree.max_depth <= 10:
             init_capacity = (2 ** (tree.max_depth + 1)) - 1
@@ -160,6 +161,7 @@ cdef class PartialFitTreeBuilder(TreeBuilder):
         for i in range(start, n_samples):
             tree.extend(X_ptr, y_ptr, i*X_s_stride, X_f_stride,
                         y_stride, rand_r_state)
+            break
 
 # Depth first builder ---------------------------------------------------------
 
@@ -528,8 +530,13 @@ cdef class Tree:
         self.capacity = capacity
         return 0
 
-    cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_f_stride):
-        cdef Node* node = &self.nodes[0]
+    cdef set_node_attributes(self, SIZE_t node_ind, SIZE_t left_child,
+                             SIZE_t right_child, SIZE_t feature, SIZE_t threshold,
+                             DTYPE_t tau, SIZE_t n_node_samples,
+                             SIZE_t weighted_n_node_samples, DOUBLE_t impurity,
+                             DOUBLE_t variance, SIZE_t X_start,
+                             SIZE_t X_f_stride, DTYPE_t* X_ptr):
+        cdef Node* node = &self.nodes[node_ind]
         cdef SIZE_t f_ind
 
         node.left_child = _TREE_LEAF
@@ -538,15 +545,18 @@ cdef class Tree:
         node.threshold = _TREE_UNDEFINED
         node.tau = INFINITY
         node.n_node_samples = node.weighted_n_node_samples = 1
-        node.impurity = 0.0
-        node.variance = 0.0
-
+        node.impurity = impurity
+        node.variance = variance
         node.lower_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
         node.upper_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
-
         for f_ind in range(self.n_features):
             node.lower_bounds[f_ind] = node.upper_bounds[f_ind] = X_ptr[X_f_stride * f_ind]
 
+    cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_f_stride):
+
+        self.set_node_attributes(0, _TREE_LEAF, _TREE_LEAF, _TREE_UNDEFINED,
+                                 _TREE_UNDEFINED, INFINITY, 1, 1, 0.0, 0.0,
+                                 0, X_f_stride, X_ptr)
         # Regression
         if self.n_classes[0] == 1:
             self.value[0] = y_ptr[0]
@@ -557,43 +567,69 @@ cdef class Tree:
     cdef void extend(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_start,
                      SIZE_t X_f_stride, SIZE_t y_stride, UINT32_t random_state):
         # Traverse the tree
-        cdef Node* node = &self.nodes[0]
+        cdef Node* curr_node = &self.nodes[0]
         cdef SIZE_t f_ind
+        cdef SIZE_t feature
         cdef DTYPE_t x
-        cdef DTYPE_t rate
+        cdef DTYPE_t new_rate
         cdef DTYPE_t* e_l = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
         cdef DTYPE_t* e_u = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
         cdef DTYPE_t* extent = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
         cdef DTYPE_t E
-        cdef SIZE_t feature
+        cdef DTYPE_t tau_parent = 0.0
         cdef double threshold
         cdef double l_b
         cdef double u_b
 
         while True:
-            rate = 0.0
+            # Step 1 in 5.6: Calculate e^l, e^u and rate.
+            new_rate = 0.0
             for f_ind in range(self.n_features):
                 x = X_ptr[X_start + f_ind * X_f_stride]
-                e_l[f_ind] = fmax(node.lower_bounds[f_ind] - x, 0)
-                e_u[f_ind] = fmax(x - node.upper_bounds[f_ind], 0)
+                e_l[f_ind] = fmax(curr_node.lower_bounds[f_ind] - x, 0)
+                e_u[f_ind] = fmax(x - curr_node.upper_bounds[f_ind], 0)
                 extent[f_ind] = e_l[f_ind] + e_u[f_ind]
-                rate += extent[f_ind]
-            E = rand_exponential(rate, &random_state)
-            feature = rand_multinomial(extent, self.n_features, &random_state)
+                new_rate += extent[f_ind]
 
-            x = X_ptr[X_start + feature * X_f_stride]
-            if x < e_l[feature]:
-                l_b = x
-                u_b = e_l[feature]
-            else:
-                l_b = e_u[feature]
-                u_b = x
-            threshold = rand_uniform(l_b, u_b, &random_state)
-            print(threshold)
-            if node.left_child == _TREE_LEAF:
-                break
+            # Step 2 in 5.6: Calculate E
+            E = rand_exponential(new_rate, &random_state)
+
+            if tau_parent + E < curr_node.tau:
+
+                # Step 4: Samples delta from a multinomial.
+                delta = rand_multinomial(extent, self.n_features, &random_state)
+
+                # Step 5: Step 5: Sample xi uniformly between bounds.
+                x_val = X_ptr[X_start + delta * X_f_stride]
+                u_b = curr_node.upper_bounds[delta]
+                l_b = curr_node.lower_bounds[delta]
+                if x_val > u_b:
+                    xi = rand_uniform(x_val, u_b, &random_state)
+                else:
+                    xi = rand_uniform(l_b, x_val, &random_state)
+
+                # Step 6: Create new node:
+                # node.left_child = _TREE_LEAF
+                # node.right_child = _TREE_LEAF
+                # node.feature = delta
+                # node.threshold = xi
+                # node.tau = tau_parent + E
+                # node.n_node_samples = curr_node.n_node_samples + 1
+                # node.impurity = 0.0
+                # node.variance = 0.0
+                #
+                # node.lower_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+                # node.upper_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+                #
+                # for f_ind in range(self.n_features):
+                #     node.lower_bounds[f_ind] = node.upper_bounds[f_ind] = X_ptr[X_f_stride * f_ind]
+
+
+            break
+
         free(e_l)
         free(e_u)
+        free(extent)
 
     cdef SIZE_t _add_node(self, SIZE_t parent, bint is_left, bint is_leaf,
                           SIZE_t feature, double threshold, double impurity,
