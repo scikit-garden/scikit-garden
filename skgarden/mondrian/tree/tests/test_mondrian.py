@@ -18,8 +18,9 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.utils.testing import assert_array_equal
 from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.utils.testing import assert_almost_equal
-from sklearn.utils.testing import assert_less
 from sklearn.utils.testing import assert_false
+from sklearn.utils.testing import assert_greater
+from sklearn.utils.testing import assert_less
 
 from skgarden.mondrian import MondrianTreeClassifier
 from skgarden.mondrian import MondrianTreeRegressor
@@ -412,6 +413,15 @@ def test_tree_attributes():
     check_tree_attributes(X, y, 0, mr.tree_)
 
 
+def check_partial_fit_one_sample(tree):
+    assert_array_equal(tree.threshold, [-2])
+    assert_array_equal(tree.feature, [-2])
+    assert_array_equal(tree.children_left, [-1])
+    assert_array_equal(tree.children_right, [-1])
+    assert_array_equal(tree.tau, [np.inf])
+    assert_array_equal(tree.n_node_samples, [1])
+
+
 def test_partial_fit_one_sample():
     rng = np.random.RandomState(0)
     X = rng.randn(1, 5)
@@ -419,8 +429,45 @@ def test_partial_fit_one_sample():
     mtr = MondrianTreeRegressor(random_state=0)
     mtr.partial_fit(X, y)
     assert_array_equal(mtr.tree_.value, [[[4.5]]])
+    check_partial_fit_one_sample(mtr.tree_)
 
     y = [1]
-    mtr = MondrianTreeClassifier(random_state=0)
-    mtr.partial_fit(X, y, classes=[0, 1])
-    assert_array_equal(mtr.tree_.value, [[[ 0.,  1.]]])
+    mtc = MondrianTreeClassifier(random_state=0)
+    mtc.partial_fit(X, y, classes=[0, 1])
+    check_partial_fit_one_sample(mtr.tree_)
+
+def check_partial_fit_two_samples(tree, X):
+    assert_array_equal(tree.n_node_samples, [1, 1, 2])
+    s_f = tree.feature[-1]
+    s_t = tree.threshold[-1]
+    sort_thresh = np.sort([X[0, s_f], X[1, s_f]])
+    assert_greater(s_t, sort_thresh[0])
+    assert_greater(sort_thresh[1], s_t)
+    if X[0, s_f] < s_t:
+        assert_array_equal(tree.children_left, [-1, -1, 0])
+        assert_array_equal(tree.children_right, [-1, -1, 1])
+    else:
+        assert_array_equal(tree.children_left, [-1, -1, 1])
+        assert_array_equal(tree.children_right, [-1, -1, 0])
+
+
+def test_partial_fit_two_samples():
+    rng = np.random.RandomState(10)
+    X = rng.randn(2, 5)
+    y = rng.randn(2)
+    mtr = MondrianTreeRegressor()
+    for r in range(10):
+        mtr.set_params(random_state=r)
+        mtr.partial_fit(X, y)
+        tree = mtr.tree_
+        assert_array_almost_equal(tree.value[:, 0, 0], [y[0], y[1], np.mean(y)])
+        check_partial_fit_two_samples(tree, X)
+
+    y = [0, 1]
+    mtc = MondrianTreeClassifier()
+    for r in range(10):
+        mtc.set_params(random_state=r)
+        mtc.partial_fit(X, y)
+        tree = mtc.tree_
+        assert_array_almost_equal(tree.value[:, 0, :], [[1, 0], [0, 1], [1, 1]])
+        check_partial_fit_two_samples(tree, X)

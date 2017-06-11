@@ -84,11 +84,12 @@ cdef class Tree:
     cdef void extend(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t x_start,
                      SIZE_t X_f_stride, SIZE_t y_stride, UINT32_t random_state)
     cdef set_node_attributes(self, SIZE_t node_ind, SIZE_t left_child,
-                             SIZE_t right_child, SIZE_t feature, SIZE_t threshold,
+                             SIZE_t right_child, SIZE_t feature, DOUBLE_t threshold,
                              DTYPE_t tau, SIZE_t n_node_samples,
-                             SIZE_t weighted_n_node_samples, DOUBLE_t impurity,
+                             DOUBLE_t weighted_n_node_samples, DOUBLE_t impurity,
                              DOUBLE_t variance, SIZE_t X_start,
-                             SIZE_t X_f_stride, DTYPE_t* X_ptr)
+                             SIZE_t X_f_stride, DTYPE_t* X_ptr,
+                             SIZE_t prev_node_ind=?)
 
 # =============================================================================
 # Tree builder
