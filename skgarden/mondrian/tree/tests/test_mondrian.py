@@ -202,8 +202,9 @@ def test_dimension_location():
     Test dimension and location of split.
     """
     rng = np.random.RandomState(0)
-    X = rng.rand(100, 2)
+    X = rng.rand(100, 3)
     X[:, 1] *= 100
+    X[:, 2] *= 50
     y = np.round(rng.randn(100))
 
     for est in estimators:
@@ -226,11 +227,11 @@ def test_dimension_location():
 
         # Check that the split location converges to the (u + l) / 2 where
         # u and l are the upper and lower bounds of the feature.
-        u = np.max(X, axis=0)[-1]
-        l = np.min(X, axis=0)[-1]
+        u = np.max(X, axis=0)[1]
+        l = np.min(X, axis=0)[1]
         thresh_sim = np.mean(thresholds[features == 1])
         thresh_act = (u + l) / 2.0
-        assert_array_almost_equal(thresh_act, thresh_sim, 2)
+        assert_array_almost_equal(thresh_act, thresh_sim, 1)
 
 def load_scaled_boston():
     boston = load_boston()
