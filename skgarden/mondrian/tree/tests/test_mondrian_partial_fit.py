@@ -73,24 +73,23 @@ def check_and_return_children(tree, node, val):
     return l_id, r_id
 
 
-def test_partial_fit_toy_data():
-    rng = np.random.RandomState(1)
+def test_partial_fit_toy_data1():
     X = [[2.0, 1.0, 3.0],
          [-1.0, 2.0, 2.0],
          [1.0, 1.5, 2.5],   # inside the bounds of the first two samples.
          [10.0, 5.0, 6.0]]  # induces a split and creates a new root.
-    # sample_ind = [0, 1, 2, 3]
-    #                root
+
+    #             [0, 1, 2, 3]
     #                 /\
     #                /  \
-    #          [0, 1, 2] 3
-    #            d=2, f=2.3608
+    #          [0, 1, 2] [3]
+    #            (d=2, f=2.3608)
     #              /\
     #             / \
-    #          1    [0, 2]
+    #          [1]    [0, 2]
     #                 / \
-    #              d=0, f=1.17251138,
-    #                2   0
+    #              (d=0, f=1.17251138)
+    #                [2]   [0]
     X = np.array(X)
     mtr = MondrianTreeRegressor(random_state=1)
     y_reg = [2, 1, 3, 4]
@@ -117,3 +116,44 @@ def test_partial_fit_toy_data():
     lrl, lrr = check_and_return_children(tree_clf, lr, [[1, 0, 1]])
     check_and_return_children(tree_clf, lrl, [[0, 0, 1]])
     check_and_return_children(tree_clf, lrr, [[1, 0, 0]])
+
+
+def test_partial_fit_toy_data2():
+    X = [[2.0, 1.0, 3.0],
+         [-1.0, 2.0, 2.0],
+         [11.0, 7.0, 4.5],
+         [10.0, 5.0, 6.0]]
+    X = np.array(X)
+
+    #            [0, 1, 2, 3]
+    #                /\
+    #               /  \
+    #          [0, 1]  [2, 3]
+    #    (d=2, f=2.36) (d=1, f=5.345)
+    #          /\        /\
+    #         / \       / \
+    #       [1] [0]    [3]  [2]
+
+    y_reg = [2, 1, 3, 4]
+    mtr = MondrianTreeRegressor(random_state=1)
+    mtr.partial_fit(X, y_reg)
+    tree = mtr.tree_
+    l, r = check_and_return_children(tree, tree.root, np.mean(y_reg))
+    ll, lr = check_and_return_children(tree, l, np.mean(y_reg[:2]))
+    rl, rr = check_and_return_children(tree, r, np.mean(y_reg[2:]))
+    check_and_return_children(tree, ll, y_reg[1])
+    check_and_return_children(tree, lr, y_reg[0])
+    check_and_return_children(tree, rl, y_reg[3])
+    check_and_return_children(tree, rr, y_reg[2])
+
+    y_clf = [0, 1, 1, 2]
+    mtc = MondrianTreeClassifier(random_state=1)
+    mtc.partial_fit(X, y_clf)
+    tree = mtc.tree_
+    l, r = check_and_return_children(tree, tree.root, [[1, 2, 1]])
+    ll, lr = check_and_return_children(tree, l, [[1, 1, 0]])
+    rl, rr = check_and_return_children(tree, r, [[0, 1, 1]])
+    check_and_return_children(tree, ll, [[0, 1, 0]])
+    check_and_return_children(tree, lr, [[1, 0, 0]])
+    check_and_return_children(tree, rl, [[0, 0, 1]])
+    check_and_return_children(tree, rr, [[0, 1, 0]])
