@@ -565,9 +565,11 @@ cdef class Tree:
             self.value[parent_ptr] = new_sum / (child.n_node_samples + 1)
         else:
             # Update class counts.
-            self.value[parent_ptr + <SIZE_t> y_ptr[y_start]] = 1.0
-            for c_ind in range(self.n_classes[0]):
-                self.value[parent_ptr + c_ind] += self.value[child_ptr + c_ind]
+            self.value[parent_ptr + <SIZE_t> y_ptr[y_start]] += 1.0
+
+            if child_id != parent_id:
+                for c_ind in range(self.n_classes[0]):
+                    self.value[parent_ptr + c_ind] += self.value[child_ptr + c_ind]
 
     cdef void set_node_attributes(self, SIZE_t node_ind, SIZE_t left_child,
                              SIZE_t right_child, SIZE_t feature, DOUBLE_t threshold,
@@ -732,6 +734,8 @@ cdef class Tree:
                 # Step 10: Update extent of node j
                 self._update_bounds_node(curr_id, curr_id, X_ptr, X_start, X_f_stride)
                 self._update_node_info(curr_id, curr_id, y_ptr, y_start)
+                curr_node.n_node_samples += 1
+                curr_node.weighted_n_node_samples += 1
 
                 # Step 12 - 13: Recurse down the tree.
                 parent_id = curr_id

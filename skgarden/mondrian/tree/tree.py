@@ -386,7 +386,7 @@ class BaseMondrianTree(BaseDecisionTree):
         if is_classifier:
             check_classification_targets(y)
 
-            # partial_fit first call
+            # First call to partial_fit
             if not hasattr(self, "le_"):
                 if len(y) == 1 and classes is None:
                     raise ValueError("Unable to infer classes. Should be "
@@ -404,10 +404,13 @@ class BaseMondrianTree(BaseDecisionTree):
         # To be consistent with sklearns tree architecture, we reshape.
         y = np.array(y, dtype=np.float64)
         y = np.reshape(y, (-1, 1))
-        self.n_features_ = X.shape[1]
-        self.n_classes_ = np.array(n_classes, dtype=np.intp)
-        self.n_outputs_ = 1
-        self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
+
+        # First call to partial_fit
+        if not hasattr(self, "tree_"):
+            self.n_features_ = X.shape[1]
+            self.n_classes_ = np.array(n_classes, dtype=np.intp)
+            self.n_outputs_ = 1
+            self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
         builder = PartialFitTreeBuilder(
             self.min_samples_split, max_depth, random_state)
         builder.build(self.tree_, X, y)
