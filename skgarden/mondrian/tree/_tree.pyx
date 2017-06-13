@@ -558,11 +558,22 @@ cdef class Tree:
         cdef Node* child = &self.nodes[child_id]
         cdef Node* parent = &self.nodes[parent_id]
         cdef DTYPE_t new_sum
+        cdef DTYPE_t old_mean
+        cdef DTYPE_t new_mean
+        cdef DTYPE_t ss
 
         if is_regression:
             # Update mean
-            new_sum = self.value[child_ptr]*child.n_node_samples + y_ptr[y_start]
-            self.value[parent_ptr] = new_sum / (child.n_node_samples + 1)
+            old_mean = self.value[child_ptr]
+            new_sum = old_mean*child.n_node_samples + y_ptr[y_start]
+            new_mean = new_sum / (child.n_node_samples + 1)
+            self.value[parent_ptr] = new_mean
+
+            # Update variance
+            ss = (child.variance + old_mean**2)*child.n_node_samples
+            parent.variance = (
+                (ss + y_ptr[y_start]**2) / (child.n_node_samples + 1) -
+                new_mean**2)
         else:
             # Update class counts.
             self.value[parent_ptr + <SIZE_t> y_ptr[y_start]] += 1.0
