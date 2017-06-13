@@ -572,12 +572,12 @@ cdef class Tree:
                     self.value[parent_ptr + c_ind] += self.value[child_ptr + c_ind]
 
     cdef void set_node_attributes(self, SIZE_t node_ind, SIZE_t left_child,
-                             SIZE_t right_child, SIZE_t feature, DOUBLE_t threshold,
-                             DTYPE_t tau, SIZE_t n_node_samples,
-                             DOUBLE_t weighted_n_node_samples, DOUBLE_t impurity,
-                             DOUBLE_t variance, SIZE_t X_start,
-                             SIZE_t X_f_stride, DTYPE_t* X_ptr,
-                             SIZE_t prev_node_ind=-1):
+                                  SIZE_t right_child, SIZE_t feature, DOUBLE_t threshold,
+                                  DTYPE_t tau, SIZE_t n_node_samples,
+                                  DOUBLE_t weighted_n_node_samples, DOUBLE_t impurity,
+                                  DOUBLE_t variance, SIZE_t X_start,
+                                  SIZE_t X_f_stride, DTYPE_t* X_ptr,
+                                  SIZE_t prev_node_ind=-1):
         cdef Node* node = &self.nodes[node_ind]
         cdef Node* prev_node
         cdef DTYPE_t x_val
@@ -666,24 +666,16 @@ cdef class Tree:
             E = rand_exponential(new_rate, &random_state)
 
             if tau_parent + E < curr_node.tau:
-
                 new_child_id = self.node_count
                 new_parent_id = self.node_count + 1
-
-                # Allocate memory for the new parent and child.
-                # Store leaf in nodes[self.node_count]
-                # Store parent in nodes[self.node_count + 1]
-                rc = self._resize_c(self.node_count + 2)
-                if rc == -1:
-                    raise MemoryError()
 
                 # Step 4: Sample delta from a multinomial.
                 delta = rand_multinomial(extent, self.n_features, &random_state)
 
                 # Step 5: Sample xi uniformly between bounds.
                 x_val = X_ptr[X_start + delta * X_f_stride]
-                u_b = curr_node.upper_bounds[delta]
                 l_b = curr_node.lower_bounds[delta]
+                u_b = curr_node.upper_bounds[delta]
                 if x_val > u_b:
                     xi = rand_uniform(u_b, x_val, &random_state)
                 else:
@@ -696,6 +688,13 @@ cdef class Tree:
                 else:
                     left_child = curr_id
                     right_child = new_child_id
+
+                # Allocate memory for the new parent and child.
+                # Store leaf in nodes[self.node_count]
+                # Store parent in nodes[self.node_count + 1]
+                rc = self._resize_c(self.node_count + 2)
+                if rc == -1:
+                    raise MemoryError()
 
                 # Step 7-8: Create new leaf node j'' and update value.
                 self.set_node_attributes(
