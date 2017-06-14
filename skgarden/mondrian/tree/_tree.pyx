@@ -875,7 +875,7 @@ cdef class Tree:
                 # Step 3
                 parent_tau = 0.0
                 p_nsy = 1.0
-                node_id = 0
+                node_id = self.root
 
                 while True:
                     node = &self.nodes[node_id]
@@ -966,7 +966,7 @@ cdef class Tree:
 
         with nogil:
             for i in range(n_samples):
-                node = self.nodes
+                node = &self.nodes[self.root]
                 # While node not a leaf
                 while node.left_child != _TREE_LEAF:
                     # ... and node.right_child != _TREE_LEAF:

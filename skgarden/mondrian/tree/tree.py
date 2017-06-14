@@ -377,7 +377,7 @@ class BaseMondrianTree(BaseDecisionTree):
     """
     def partial_fit(self, X, y, classes=None):
         random_state = check_random_state(self.random_state)
-        X, y = check_X_y(X, y, dtype=DTYPE, multi_output=False)
+        X, y = check_X_y(X, y, dtype=DTYPE, multi_output=False, order="C")
         is_classifier = isinstance(self, ClassifierMixin)
         random_state = check_random_state(self.random_state)
         max_depth = ((2 ** 31) - 1 if self.max_depth is None
@@ -396,6 +396,7 @@ class BaseMondrianTree(BaseDecisionTree):
                     self.le_.fit(classes)
                 else:
                     self.le_.fit(y)
+                self.classes_ = self.le_.classes_
             y = self.le_.transform(y)
             n_classes = [len(self.le_.classes_)]
         else:

@@ -1,3 +1,7 @@
+"""
+Tests specific to incremental building of trees.
+"""
+
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.datasets import make_regression

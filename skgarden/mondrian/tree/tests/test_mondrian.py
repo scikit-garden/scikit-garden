@@ -127,13 +127,19 @@ def test_reg_boston():
     score = mean_squared_error(mtr.predict(X), y)
     assert_less(score, 1, "Failed with score = {0}".format(score))
 
+    mtr.partial_fit(X, y)
+    score = mean_squared_error(mtr.predict(X), y)
+    assert_less(score, 1, "Failed with score = {0}".format(score))
+
 
 def test_array_repr():
     X = np.arange(10000)[:, np.newaxis]
     y = np.arange(10000)
 
     for est in estimators:
-        est.fit(X, y)
+        new_est = clone(est)
+        new_est.fit(X, y)
+        # new_est.partial_fit(X, y)
 
 
 def test_pure_set():
@@ -142,6 +148,10 @@ def test_pure_set():
     for est in estimators:
         est.fit(X, y)
         assert_array_almost_equal(est.predict(X), y)
+
+        new_est = clone(est)
+        new_est.partial_fit(X, y)
+        assert_array_almost_equal(new_est.predict(X), y)
 
 
 def test_numerical_stability():
@@ -159,14 +169,15 @@ def test_numerical_stability():
 
     with np.errstate(all="raise"):
         for est in estimators:
+            new_est = clone(est)
             if isinstance(est, ClassifierMixin):
                 y_curr = np.round(y)
             else:
                 y_curr = y
-            est.fit(X, y_curr)
-            est.fit(X, -y_curr)
-            est.fit(-X, y_curr)
-            est.fit(-X, -y_curr)
+            new_est.fit(X, y_curr)
+            new_est.fit(X, -y_curr)
+            new_est.fit(-X, y_curr)
+            new_est.fit(-X, -y_curr)
 
 
 def test_min_samples_split():
@@ -233,6 +244,7 @@ def test_dimension_location():
         thresh_act = (u + l) / 2.0
         assert_array_almost_equal(thresh_act, thresh_sim, 1)
 
+
 def load_scaled_boston():
     boston = load_boston()
     X, y = boston.data, boston.target
@@ -244,6 +256,7 @@ def load_scaled_boston():
     X_train = minmax.fit_transform(X_train)
     X_test = minmax.transform(X_test)
     return X_train, X_test, y_train, y_test
+
 
 def test_weighted_decision_path_train():
     """
@@ -336,16 +349,12 @@ def test_std_positive():
     assert_false(np.any(np.isinf(y_std)))
 
 
-def test_mean_std_reg_convergence():
-    X_train, _, y_train, _ = load_scaled_boston()
-    mr = MondrianTreeRegressor(random_state=0)
-    mr.fit(X_train, y_train)
-
+def check_mean_std_reg_convergence(est, X_train, y_train):
     # For points completely in the training data and when
     # tree is grown to full depth.
     # mean should converge to the actual target value.
     # variance should converge to 0.0
-    mean, std = mr.predict(X_train, return_std=True)
+    mean, std = est.predict(X_train, return_std=True)
     assert_array_almost_equal(mean, y_train, 5)
     assert_array_almost_equal(std, 0.0, 2)
 
@@ -354,17 +363,24 @@ def test_mean_std_reg_convergence():
     # X is scaled between to -1.0 and 1.0
     X_inf = np.vstack((20.0 * np.ones(X_train.shape[1]),
                        -20.0 * np.ones(X_train.shape[1])))
-    inf_mean, inf_std = mr.predict(X_inf, return_std=True)
+    inf_mean, inf_std = est.predict(X_inf, return_std=True)
     assert_array_almost_equal(inf_mean, y_train.mean(), 1)
     assert_array_almost_equal(inf_std, y_train.std(), 2)
 
 
-def test_proba_classif_convergence():
+def test_mean_std_reg_convergence():
     X_train, _, y_train, _ = load_scaled_boston()
-    y_train = np.round(y_train)
-    mc = MondrianTreeClassifier(random_state=0)
-    mc.fit(X_train, y_train)
+    mr = MondrianTreeRegressor(random_state=0)
+    mr.fit(X_train, y_train)
+    check_mean_std_reg_convergence(mr, X_train, y_train)
 
+    n_s = int(len(X_train) / 2)
+    mr.partial_fit(X_train[:n_s], y_train[:n_s])
+    mr.partial_fit(X_train[n_s:], y_train[n_s:])
+    check_mean_std_reg_convergence(mr, X_train, y_train)
+
+
+def check_proba_classif_convergence(X_train, y_train, mc):
     lb = LabelBinarizer()
     y_bin = lb.fit_transform(y_train)
 
@@ -386,13 +402,25 @@ def test_proba_classif_convergence():
     assert_array_almost_equal(inf_proba, [emp_proba, emp_proba])
 
 
-def check_tree_attributes(X, y, node_id, tree):
+def test_proba_classif_convergence():
+    X_train, _, y_train, _ = load_scaled_boston()
+    y_train = np.round(y_train)
+    mc = MondrianTreeClassifier(random_state=0)
+    mc.fit(X_train, y_train)
+    check_proba_classif_convergence(X_train, y_train, mc)
+
+    mc.partial_fit(X_train, y_train)
+    check_proba_classif_convergence(X_train, y_train, mc)
+
+
+def check_tree_attributes(X, y, node_id, tree, check_impurity=True):
     """
     Recursive function to test the mean and variance at every node.
     """
-    assert_almost_equal(np.var(y), tree.variance[node_id])
-    assert_almost_equal(np.mean(y), tree.mean[node_id])
-    assert_almost_equal(np.var(y), tree.impurity[node_id])
+    assert_almost_equal(np.var(y), tree.variance[node_id], 6)
+    assert_almost_equal(np.mean(y), tree.mean[node_id], 6)
+    if check_impurity:
+        assert_almost_equal(np.var(y), tree.impurity[node_id])
     left_child = tree.children_left[node_id]
     right_child = tree.children_right[node_id]
 
@@ -412,3 +440,5 @@ def test_tree_attributes():
     mr = MondrianTreeRegressor(random_state=0)
     mr.fit(X, y)
     check_tree_attributes(X, y, 0, mr.tree_)
+    mr.partial_fit(X, y)
+    check_tree_attributes(X, y, mr.tree_.root, mr.tree_, False)
