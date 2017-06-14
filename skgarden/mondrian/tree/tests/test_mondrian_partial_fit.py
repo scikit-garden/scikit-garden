@@ -198,7 +198,7 @@ def check_partial_fit_equivalence(size_batch, est, random_state, X, y, is_clf=Fa
     assert_array_equal(p_est.tree_.value, est.tree_.value)
 
 
-def test_mondrian_tree_partial_fit_equivalence():
+def test_partial_fit_equivalence():
     X, y = make_regression(random_state=0, n_samples=100)
     mtr = MondrianTreeRegressor(random_state=0)
     mtr.partial_fit(X, y)
@@ -210,3 +210,24 @@ def test_mondrian_tree_partial_fit_equivalence():
     mtc.partial_fit(X, y)
     for batch_size in [10, 20, 25, 50, 90]:
         check_partial_fit_equivalence(batch_size, mtc, 0, X, y, is_clf=True)
+
+
+def check_partial_fit_duplicates(est, values):
+    assert_array_equal(est.tree_.n_node_samples, [100])
+    assert_almost_equal(est.tree_.value, values)
+    assert_array_equal(est.tree_.children_left, [-1])
+    assert_array_equal(est.tree_.children_right, [-1])
+    assert_array_equal(est.tree_.root, 0)
+
+def test_partial_fit_duplicates():
+    rng = np.random.RandomState(0)
+    X = rng.randn(1, 100)
+    X_dup = np.tile(X, (100, 1))
+    y = [2] * 100
+    mtr = MondrianTreeRegressor(random_state=0)
+    mtr.partial_fit(X_dup, y)
+    check_partial_fit_duplicates(mtr, [[[2.0]]])
+
+    mtc = MondrianTreeClassifier(random_state=0)
+    mtc.partial_fit(X_dup, y, classes=[1, 2])
+    check_partial_fit_duplicates(mtc, [[[0.0, 100.0]]])

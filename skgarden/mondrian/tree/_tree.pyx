@@ -749,6 +749,8 @@ cdef class Tree:
                 curr_node.n_node_samples += 1
                 curr_node.weighted_n_node_samples += 1
 
+                if curr_node.left_child == -1:
+                    break
                 # Step 12 - 13: Recurse down the tree.
                 parent_id = curr_id
                 if X_ptr[X_start + curr_node.feature*X_f_stride] < curr_node.threshold:
