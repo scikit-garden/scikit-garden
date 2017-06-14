@@ -1,6 +1,8 @@
 import numpy as np
+from sklearn.datasets import make_classification
 from sklearn.datasets import make_regression
 from sklearn.utils.testing import assert_almost_equal
+from sklearn.utils.testing import assert_equal
 from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.utils.testing import assert_array_equal
 from sklearn.utils.testing import assert_greater
@@ -178,3 +180,33 @@ def test_mondrian_tree_n_node_samples():
         mtr = MondrianTreeRegressor(random_state=0)
         mtr.partial_fit(X, y)
         assert_array_equal(mtr.tree_.n_node_samples, [1, 1, 2])
+
+
+def check_partial_fit_equivalence(size_batch, est, random_state, X, y, is_clf=False):
+    start_ptr = list(range(0, 100, size_batch))
+    end_ptr = start_ptr[1:] + [100]
+    if not is_clf:
+        p_est = MondrianTreeRegressor(random_state=random_state)
+    else:
+        p_est = MondrianTreeClassifier(random_state=random_state)
+    for start, end in zip(start_ptr, end_ptr):
+        p_est.partial_fit(X[start:end], y[start:end])
+    assert_array_equal(p_est.tree_.n_node_samples, est.tree_.n_node_samples)
+    assert_array_equal(p_est.tree_.threshold, est.tree_.threshold)
+    assert_array_equal(p_est.tree_.feature, est.tree_.feature)
+    assert_equal(p_est.tree_.root, est.tree_.root)
+    assert_array_equal(p_est.tree_.value, est.tree_.value)
+
+
+def test_mondrian_tree_partial_fit_equivalence():
+    X, y = make_regression(random_state=0, n_samples=100)
+    mtr = MondrianTreeRegressor(random_state=0)
+    mtr.partial_fit(X, y)
+    for batch_size in [10, 20, 25, 50, 90]:
+        check_partial_fit_equivalence(batch_size, mtr, 0, X, y)
+
+    X, y = make_classification(random_state=0, n_samples=100)
+    mtc = MondrianTreeClassifier(random_state=0)
+    mtc.partial_fit(X, y)
+    for batch_size in [10, 20, 25, 50, 90]:
+        check_partial_fit_equivalence(batch_size, mtc, 0, X, y, is_clf=True)
