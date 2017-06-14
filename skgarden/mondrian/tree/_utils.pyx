@@ -85,6 +85,32 @@ cdef inline double rand_uniform(double low, double high,
 cdef inline double log(double x) nogil:
     return ln(x) / ln(2.0)
 
+cdef inline int rand_multinomial(DTYPE_t* pvals, SIZE_t n_features,
+                                 UINT32_t* random_state) nogil:
+    """Sample n=1 from a multinomial where pvals is not normalized and cumulative"""
+    cdef double search
+    cdef DTYPE_t* cum_pvals = <DTYPE_t*> malloc(n_features * sizeof(DTYPE_t))
+    cdef SIZE_t f_j
+    cdef double lower_bound
+
+    cum_pvals[0] = pvals[0]
+    for f_j in range(1, n_features):
+        cum_pvals[f_j] = cum_pvals[f_j - 1] + pvals[f_j]
+
+    search = rand_uniform(0.0, cum_pvals[n_features-1], random_state)
+
+    for f_j in range(n_features):
+        if f_j == 0:
+            lower_bound = 0.0
+        else:
+            lower_bound = cum_pvals[f_j - 1]
+        if cum_pvals[f_j] >= search and lower_bound < search:
+            break
+    free(cum_pvals)
+    return f_j
+
+cdef inline double rand_exponential(DTYPE_t rate, UINT32_t* random_state) nogil:
+    return -ln(rand_uniform(0.0, 1.0, random_state)) / rate
 
 # =============================================================================
 # Stack data structure

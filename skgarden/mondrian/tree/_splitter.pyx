@@ -31,10 +31,13 @@ np.import_array()
 from scipy.sparse import csc_matrix
 
 from ._utils cimport log
+from ._utils cimport rand_exponential
 from ._utils cimport rand_int
+from ._utils cimport rand_multinomial
 from ._utils cimport rand_uniform
 from ._utils cimport RAND_R_MAX
 from ._utils cimport safe_realloc
+
 
 cdef double INFINITY = np.inf
 
@@ -345,7 +348,7 @@ cdef class MondrianSplitter(BaseDenseSplitter):
         cdef DTYPE_t rate = 0.0
         cdef DTYPE_t upper_bound
         cdef DTYPE_t lower_bound
-        cdef DTYPE_t* cum_diff = <DTYPE_t*> malloc(n_features * sizeof(DTYPE_t))
+        cdef DTYPE_t* pvals = <DTYPE_t*> malloc(n_features * sizeof(DTYPE_t))
         cdef DTYPE_t search
 
         self.set_bounds()
@@ -353,25 +356,12 @@ cdef class MondrianSplitter(BaseDenseSplitter):
         for f_j in range(n_features):
             upper_bound = self.upper_bounds[f_j]
             lower_bound = self.lower_bounds[f_j]
-            cum_diff[f_j] = upper_bound - lower_bound
-
-            if f_j != 0:
-                cum_diff[f_j] += cum_diff[f_j - 1]
+            pvals[f_j] = upper_bound - lower_bound
             rate += (upper_bound - lower_bound)
 
-        # Sample time of split to be -ln(U) / rate.
-        split.E = -ln(rand_uniform(0.0, 1.0, random_state)) / rate
-
+        split.E = rand_exponential(rate, random_state)
         # Sample dimension delta with a probability proportional to (u_d - l_d)
-        search = rand_uniform(0.0, cum_diff[n_features-1], random_state)
-        for f_j in range(n_features):
-            if f_j == 0:
-                lower_bound = 0.0
-            else:
-                lower_bound = cum_diff[f_j - 1]
-            if cum_diff[f_j] >= search and lower_bound < search:
-                split.feature = f_j
-                break
+        split.feature = rand_multinomial(pvals, n_features, random_state)
 
         # Sample location xi uniformly between (l_d[delta], u_d[delta])
         split.threshold = rand_uniform(
@@ -397,5 +387,5 @@ cdef class MondrianSplitter(BaseDenseSplitter):
         self.criterion.update(split.pos)
         self.criterion.children_impurity(&split.impurity_left,
                                          &split.impurity_right)
-        free(cum_diff)
+        free(pvals)
         return 0

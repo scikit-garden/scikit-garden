@@ -58,6 +58,7 @@ cdef class Tree:
     cdef double* value                   # (capacity, n_outputs, max_n_classes) array of values
     cdef SIZE_t value_stride             # = n_outputs * max_n_classes
 
+    cdef SIZE_t root
     # Methods
     cdef SIZE_t _add_node(self, SIZE_t parent, bint is_left, bint is_leaf,
                           SIZE_t feature, double threshold, double impurity,
@@ -80,8 +81,20 @@ cdef class Tree:
     cpdef object decision_path(self, object X)
     cdef object _decision_path_dense(self, object X)
     cpdef object weighted_decision_path(self, object X)
-
-
+    cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_stride)
+    cdef void extend(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t x_start,
+                     SIZE_t X_f_stride, SIZE_t y_stride, UINT32_t random_state)
+    cdef void set_node_attributes(self, SIZE_t node_ind, SIZE_t left_child,
+                                  SIZE_t right_child, SIZE_t feature, DOUBLE_t threshold,
+                                  DTYPE_t tau, SIZE_t n_node_samples,
+                                  DOUBLE_t weighted_n_node_samples, DOUBLE_t impurity,
+                                  DOUBLE_t variance, SIZE_t X_start,
+                                  SIZE_t X_f_stride, DTYPE_t* X_ptr,
+                                  SIZE_t prev_node_ind=?)
+    cdef void _update_bounds_node(self, SIZE_t node_ind, SIZE_t prev_node_ind,
+                                  DTYPE_t* X_ptr, SIZE_t X_start, SIZE_t X_f_stride)
+    cdef void _update_node_info(self, SIZE_t parent_id, SIZE_t child_id,
+                                DOUBLE_t* y_ptr, SIZE_t y_start)
 # =============================================================================
 # Tree builder
 # =============================================================================
@@ -100,6 +113,7 @@ cdef class TreeBuilder:
     cdef SIZE_t min_samples_leaf    # Minimum number of samples in a leaf
     cdef double min_weight_leaf     # Minimum weight in a leaf
     cdef SIZE_t max_depth           # Maximal tree depth
+    cdef object random_state
 
     cpdef build(self, Tree tree, object X, np.ndarray y,
                 np.ndarray sample_weight=*,

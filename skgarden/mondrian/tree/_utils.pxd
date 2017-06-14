@@ -54,6 +54,10 @@ cdef SIZE_t rand_int(SIZE_t low, SIZE_t high,
 cdef double rand_uniform(double low, double high,
                          UINT32_t* random_state) nogil
 
+cdef SIZE_t rand_multinomial(DTYPE_t* pvals, SIZE_t n_features,
+                             UINT32_t* random_state) nogil
+
+cdef double rand_exponential(DTYPE_t rate, UINT32_t* random_state) nogil
 
 cdef double log(double x) nogil
 

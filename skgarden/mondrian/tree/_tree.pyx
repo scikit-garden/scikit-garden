@@ -20,6 +20,7 @@ from cpython cimport Py_INCREF, PyObject
 
 from libc.math cimport exp
 from libc.math cimport fmax
+from libc.math cimport fmin
 from libc.math cimport sqrt
 from libc.stdlib cimport free
 from libc.stdlib cimport malloc
@@ -36,6 +37,10 @@ from ._utils cimport Stack
 from ._utils cimport StackRecord
 from ._utils cimport safe_realloc
 from ._utils cimport sizet_ptr_to_ndarray
+from ._utils cimport rand_exponential
+from ._utils cimport rand_multinomial
+from ._utils cimport rand_uniform
+from ._utils cimport RAND_R_MAX
 
 cdef extern from "numpy/arrayobject.h":
     object PyArray_NewFromDescr(object subtype, np.dtype descr,
@@ -114,6 +119,50 @@ cdef class TreeBuilder:
 
         return X, y, sample_weight
 
+cdef class PartialFitTreeBuilder(TreeBuilder):
+    """Build a decision tree incrementally."""
+
+    def __cinit__(self, SIZE_t min_samples_split, SIZE_t max_depth,
+                  object random_state):
+        self.min_samples_split = min_samples_split
+        self.max_depth = max_depth
+        self.random_state = random_state
+
+    cpdef build(self, Tree tree, object X, np.ndarray y,
+                np.ndarray sample_weight=None,
+                np.ndarray X_idx_sorted=None):
+        X, y, sample_weight = self._check_input(X, y, None)
+
+        cdef UINT32_t rand_r_state = self.random_state.randint(0, RAND_R_MAX)
+        cdef int n_samples = X.shape[0]
+        cdef int n_features = X.shape[1]
+        cdef int init_capacity
+        if tree.max_depth <= 10:
+            init_capacity = (2 ** (tree.max_depth + 1)) - 1
+        else:
+            init_capacity = 2047
+        tree._resize(init_capacity)
+
+        cdef np.ndarray X_ndarray = X
+        cdef DTYPE_t* X_ptr = <DTYPE_t*> X_ndarray.data
+        cdef SIZE_t X_s_stride = X.strides[0] / X.itemsize
+        cdef SIZE_t X_f_stride = X.strides[1] / X.itemsize
+        cdef DOUBLE_t* y_ptr = <DOUBLE_t*> y.data
+        cdef SIZE_t y_stride = y.strides[0] / y.itemsize
+        cdef SIZE_t sample_ind
+        cdef SIZE_t start
+        cdef Node* node
+
+        if tree.node_count == 0:
+            tree._init(X_ptr, y_ptr, X_f_stride)
+            start = 1
+        else:
+            start = 0
+
+        for i in range(start, n_samples):
+            tree.extend(X_ptr, y_ptr, i*X_s_stride, X_f_stride,
+                        i*y_stride, rand_r_state)
+
 # Depth first builder ---------------------------------------------------------
 
 cdef class DepthFirstTreeBuilder(TreeBuilder):
@@ -139,12 +188,10 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
 
         # Initial capacity
         cdef int init_capacity
-
         if tree.max_depth <= 10:
             init_capacity = (2 ** (tree.max_depth + 1)) - 1
         else:
             init_capacity = 2047
-
         tree._resize(init_capacity)
 
         # Parameters
@@ -361,6 +408,10 @@ cdef class Tree:
         def __get__(self):
             return self._get_node_ndarray()["variance"][:self.node_count]
 
+    property root:
+        def __get__(self):
+            return self.root
+
     def __cinit__(self, int n_features, np.ndarray[SIZE_t, ndim=1] n_classes,
                   int n_outputs):
         """Constructor."""
@@ -383,6 +434,9 @@ cdef class Tree:
         self.capacity = 0
         self.value = NULL
         self.nodes = NULL
+
+        # Used only in partial_fit
+        self.root = 0
 
     def __dealloc__(self):
         """Destructor."""
@@ -481,6 +535,232 @@ cdef class Tree:
 
         self.capacity = capacity
         return 0
+
+    cdef void _update_bounds_node(self, SIZE_t node_ind, SIZE_t prev_node_ind,
+                                  DTYPE_t* X_ptr, SIZE_t X_start, SIZE_t X_f_stride):
+        cdef SIZE_t f_ind
+        cdef DTYPE_t x_val
+        cdef Node* node = &self.nodes[node_ind]
+        cdef Node* prev_node = &self.nodes[prev_node_ind]
+
+        for f_ind in range(self.n_features):
+            x_val = X_ptr[X_start + X_f_stride*f_ind]
+            node.lower_bounds[f_ind] = fmin(x_val, prev_node.lower_bounds[f_ind])
+            node.upper_bounds[f_ind] = fmax(x_val, prev_node.upper_bounds[f_ind])
+
+    cdef void _update_node_info(self, SIZE_t parent_id, SIZE_t child_id,
+                                DOUBLE_t* y_ptr, SIZE_t y_start):
+
+        cdef SIZE_t is_regression = self.n_classes[0] == 1
+        cdef SIZE_t child_ptr = child_id*self.value_stride
+        cdef SIZE_t parent_ptr = parent_id*self.value_stride
+        cdef SIZE_t c_ind
+        cdef Node* child = &self.nodes[child_id]
+        cdef Node* parent = &self.nodes[parent_id]
+        cdef DTYPE_t new_sum
+        cdef DTYPE_t old_mean
+        cdef DTYPE_t new_mean
+        cdef DTYPE_t ss
+
+        if is_regression:
+            # Update mean
+            old_mean = self.value[child_ptr]
+            new_sum = old_mean*child.n_node_samples + y_ptr[y_start]
+            new_mean = new_sum / (child.n_node_samples + 1)
+            self.value[parent_ptr] = new_mean
+
+            # Update variance
+            ss = (child.variance + old_mean**2)*child.n_node_samples
+            parent.variance = (
+                (ss + y_ptr[y_start]**2) / (child.n_node_samples + 1) -
+                new_mean**2)
+        else:
+            # Update class counts.
+            self.value[parent_ptr + <SIZE_t> y_ptr[y_start]] += 1.0
+
+            if child_id != parent_id:
+                for c_ind in range(self.n_classes[0]):
+                    self.value[parent_ptr + c_ind] += self.value[child_ptr + c_ind]
+
+    cdef void set_node_attributes(self, SIZE_t node_ind, SIZE_t left_child,
+                                  SIZE_t right_child, SIZE_t feature, DOUBLE_t threshold,
+                                  DTYPE_t tau, SIZE_t n_node_samples,
+                                  DOUBLE_t weighted_n_node_samples, DOUBLE_t impurity,
+                                  DOUBLE_t variance, SIZE_t X_start,
+                                  SIZE_t X_f_stride, DTYPE_t* X_ptr,
+                                  SIZE_t prev_node_ind=-1):
+        cdef Node* node = &self.nodes[node_ind]
+        cdef Node* prev_node
+        cdef DTYPE_t x_val
+        cdef SIZE_t f_ind
+
+        node.left_child = left_child
+        node.right_child = right_child
+        node.feature = feature
+        node.threshold = threshold
+        node.tau = tau
+        node.n_node_samples = n_node_samples
+        node.weighted_n_node_samples = weighted_n_node_samples
+        node.impurity = impurity
+        node.variance = variance
+        node.lower_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+        node.upper_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+
+        # If prev_node is -1, its a leaf, else update the extent of each node.
+        if prev_node_ind == -1:
+            for f_ind in range(self.n_features):
+                x_val = X_ptr[X_start + X_f_stride*f_ind]
+                node.lower_bounds[f_ind] = node.upper_bounds[f_ind] = x_val
+        else:
+            self._update_bounds_node(
+                node_ind, prev_node_ind, X_ptr, X_start, X_f_stride)
+
+    cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_f_stride):
+
+        self.set_node_attributes(0, _TREE_LEAF, _TREE_LEAF, _TREE_UNDEFINED,
+                                 _TREE_UNDEFINED, INFINITY, 1, 1, 0.0, 0.0,
+                                 0, X_f_stride, X_ptr)
+        # Regression
+        if self.n_classes[0] == 1:
+            self.value[0] = y_ptr[0]
+        else:
+            self.value[<SIZE_t> y_ptr[0]] = 1.0
+        self.node_count += 1
+
+    cdef void extend(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_start,
+                     SIZE_t X_f_stride, SIZE_t y_start, UINT32_t random_state):
+        # Traverse the tree
+        cdef SIZE_t curr_id = self.root
+        cdef SIZE_t parent_id = -1
+        cdef SIZE_t left_id
+        cdef SIZE_t right_id
+        cdef SIZE_t new_child_id
+        cdef SIZE_t new_parent_id
+        cdef SIZE_t f_ind
+        cdef SIZE_t feature
+        cdef SIZE_t val_ptr
+        cdef SIZE_t delta
+
+        cdef Node* curr_node
+        cdef Node* parent_node
+        cdef Node* node
+
+        cdef DTYPE_t x
+        cdef DTYPE_t x_val
+        cdef DTYPE_t new_rate
+        cdef DTYPE_t* e_l = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+        cdef DTYPE_t* e_u = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+        cdef DTYPE_t* extent = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
+        cdef DTYPE_t E
+        cdef DTYPE_t new_sum
+        cdef DTYPE_t tau_parent = 0.0
+        cdef DTYPE_t threshold
+        cdef DTYPE_t l_b
+        cdef DTYPE_t u_b
+        cdef int is_regression = self.n_classes[0] == 1
+        cdef int c_ind
+        cdef SIZE_t rc
+
+
+        while True:
+            curr_node = &self.nodes[curr_id]
+
+            # Step 1 in 5.6: Calculate e^l, e^u and rate.
+            new_rate = 0.0
+            for f_ind in range(self.n_features):
+                x = X_ptr[X_start + f_ind * X_f_stride]
+                e_l[f_ind] = fmax(curr_node.lower_bounds[f_ind] - x, 0)
+                e_u[f_ind] = fmax(x - curr_node.upper_bounds[f_ind], 0)
+                extent[f_ind] = e_l[f_ind] + e_u[f_ind]
+                new_rate += extent[f_ind]
+
+            # Step 2 in 5.6: Calculate E
+            E = rand_exponential(new_rate, &random_state)
+
+            if tau_parent + E < curr_node.tau:
+                new_child_id = self.node_count
+                new_parent_id = self.node_count + 1
+
+                # Step 4: Sample delta from a multinomial.
+                delta = rand_multinomial(extent, self.n_features, &random_state)
+
+                # Step 5: Sample xi uniformly between bounds.
+                x_val = X_ptr[X_start + delta * X_f_stride]
+                l_b = curr_node.lower_bounds[delta]
+                u_b = curr_node.upper_bounds[delta]
+                if x_val > u_b:
+                    xi = rand_uniform(u_b, x_val, &random_state)
+                else:
+                    xi = rand_uniform(x_val, l_b, &random_state)
+
+                # Step 7: Split criteria.
+                if x_val < xi:
+                    left_child = new_child_id
+                    right_child = curr_id
+                else:
+                    left_child = curr_id
+                    right_child = new_child_id
+
+                # Allocate memory for the new parent and child.
+                # Store leaf in nodes[self.node_count]
+                # Store parent in nodes[self.node_count + 1]
+                rc = self._resize_c(self.node_count + 2)
+                if rc == -1:
+                    raise MemoryError()
+
+                curr_node = &self.nodes[curr_id]
+                # Step 7-8: Create new leaf node j'' and update value.
+                self.set_node_attributes(
+                    new_child_id, _TREE_LEAF, _TREE_LEAF, _TREE_UNDEFINED,
+                    _TREE_UNDEFINED, INFINITY, 1, 1, 0.0, 0.0, X_start,
+                    X_f_stride, X_ptr)
+
+                # Update value data-structure for Regression
+                val_ptr = new_child_id*self.value_stride
+                if is_regression:
+                    self.value[val_ptr] = y_ptr[y_start]
+                else:
+                    self.value[val_ptr + <SIZE_t> y_ptr[y_start]] = 1.0
+
+                # Step 6 - Create new parent node j'
+                self.set_node_attributes(
+                    new_parent_id, left_child, right_child, delta, xi,
+                    tau_parent + E, curr_node.n_node_samples + 1,
+                    curr_node.weighted_n_node_samples + 1, 0.0, 0.0, X_start,
+                    X_f_stride, X_ptr, curr_id)
+                self._update_node_info(new_parent_id, curr_id, y_ptr, y_start)
+
+                # New root.
+                if curr_id == self.root:
+                    self.root = new_parent_id
+                else:
+                    parent_node = &self.nodes[parent_id]
+                    if parent_node.left_child == curr_id:
+                        parent_node.left_child = new_parent_id
+                    else:
+                        parent_node.right_child = new_parent_id
+                self.max_depth += 1
+                self.node_count += 2
+                break
+            else:
+                # Step 10: Update extent of node j
+                self._update_bounds_node(curr_id, curr_id, X_ptr, X_start, X_f_stride)
+                self._update_node_info(curr_id, curr_id, y_ptr, y_start)
+                curr_node.n_node_samples += 1
+                curr_node.weighted_n_node_samples += 1
+
+                if curr_node.left_child == -1:
+                    break
+                # Step 12 - 13: Recurse down the tree.
+                parent_id = curr_id
+                if X_ptr[X_start + curr_node.feature*X_f_stride] < curr_node.threshold:
+                    curr_id = curr_node.left_child
+                else:
+                    curr_id = curr_node.right_child
+                tau_parent = curr_node.tau
+        free(e_l)
+        free(e_u)
+        free(extent)
 
     cdef SIZE_t _add_node(self, SIZE_t parent, bint is_left, bint is_leaf,
                           SIZE_t feature, double threshold, double impurity,
@@ -595,7 +875,7 @@ cdef class Tree:
                 # Step 3
                 parent_tau = 0.0
                 p_nsy = 1.0
-                node_id = 0
+                node_id = self.root
 
                 while True:
                     node = &self.nodes[node_id]
@@ -686,7 +966,7 @@ cdef class Tree:
 
         with nogil:
             for i in range(n_samples):
-                node = self.nodes
+                node = &self.nodes[self.root]
                 # While node not a leaf
                 while node.left_child != _TREE_LEAF:
                     # ... and node.right_child != _TREE_LEAF:
