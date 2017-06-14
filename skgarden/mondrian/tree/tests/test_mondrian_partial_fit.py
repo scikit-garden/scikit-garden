@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.datasets import make_regression
 from sklearn.utils.testing import assert_almost_equal
 from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.utils.testing import assert_array_equal
@@ -169,3 +170,11 @@ def test_partial_fit_toy_data2():
     check_and_return_children(tree, lr, [[1, 0, 0]])
     check_and_return_children(tree, rl, [[0, 0, 1]])
     check_and_return_children(tree, rr, [[0, 1, 0]])
+
+
+def test_mondrian_tree_n_node_samples():
+    for r in range(1000):
+        X, y = make_regression(n_samples=2, random_state=r)
+        mtr = MondrianTreeRegressor(random_state=0)
+        mtr.partial_fit(X, y)
+        assert_array_equal(mtr.tree_.n_node_samples, [1, 1, 2])

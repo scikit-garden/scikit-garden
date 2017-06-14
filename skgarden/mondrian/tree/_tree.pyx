@@ -661,6 +661,7 @@ cdef class Tree:
         cdef int c_ind
         cdef SIZE_t rc
 
+
         while True:
             curr_node = &self.nodes[curr_id]
 
@@ -707,6 +708,7 @@ cdef class Tree:
                 if rc == -1:
                     raise MemoryError()
 
+                curr_node = &self.nodes[curr_id]
                 # Step 7-8: Create new leaf node j'' and update value.
                 self.set_node_attributes(
                     new_child_id, _TREE_LEAF, _TREE_LEAF, _TREE_UNDEFINED,
@@ -721,7 +723,6 @@ cdef class Tree:
                     self.value[val_ptr + <SIZE_t> y_ptr[y_start]] = 1.0
 
                 # Step 6 - Create new parent node j'
-                # XXX: Fix variance and impurity
                 self.set_node_attributes(
                     new_parent_id, left_child, right_child, delta, xi,
                     tau_parent + E, curr_node.n_node_samples + 1,
@@ -738,6 +739,7 @@ cdef class Tree:
                         parent_node.left_child = new_parent_id
                     else:
                         parent_node.right_child = new_parent_id
+                self.max_depth += 1
                 self.node_count += 2
                 break
             else:
