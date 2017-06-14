@@ -76,11 +76,9 @@ cdef class Tree:
 
     cpdef np.ndarray apply(self, object X)
     cdef np.ndarray _apply_dense(self, object X)
-    cdef np.ndarray _apply_sparse_csr(self, object X)
 
     cpdef object decision_path(self, object X)
     cdef object _decision_path_dense(self, object X)
-    cdef object _decision_path_sparse_csr(self, object X)
     cpdef object weighted_decision_path(self, object X)
 
 
