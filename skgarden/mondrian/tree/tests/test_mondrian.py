@@ -133,13 +133,13 @@ def test_reg_boston():
 
 
 def test_array_repr():
-    X = np.arange(10000)[:, np.newaxis]
-    y = np.arange(10000)
+    X = np.arange(10)[:, np.newaxis]
+    y = np.arange(10)
 
     for est in estimators:
         new_est = clone(est)
         new_est.fit(X, y)
-        # new_est.partial_fit(X, y)
+        new_est.partial_fit(X, y)
 
 
 def test_pure_set():
@@ -178,6 +178,8 @@ def test_numerical_stability():
             new_est.fit(X, -y_curr)
             new_est.fit(-X, y_curr)
             new_est.fit(-X, -y_curr)
+            new_est.partial_fit(X, y_curr)
+            new_est.partial_fit(-X, y_curr)
 
 
 def test_min_samples_split():
@@ -426,11 +428,13 @@ def check_tree_attributes(X, y, node_id, tree, check_impurity=True):
 
     if left_child != -1:
         left_ind = X[:, tree.feature[node_id]] < tree.threshold[node_id]
-        check_tree_attributes(X[left_ind], y[left_ind], left_child, tree)
+        check_tree_attributes(
+            X[left_ind], y[left_ind], left_child, tree, check_impurity)
 
     if right_child != -1:
         right_ind = X[:, tree.feature[node_id]] > tree.threshold[node_id]
-        check_tree_attributes(X[right_ind], y[right_ind], right_child, tree)
+        check_tree_attributes(
+            X[right_ind], y[right_ind], right_child, tree, check_impurity)
 
 
 def test_tree_attributes():

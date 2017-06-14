@@ -383,11 +383,14 @@ class BaseMondrianTree(BaseDecisionTree):
         max_depth = ((2 ** 31) - 1 if self.max_depth is None
                      else self.max_depth)
 
+        first_call = not hasattr(self, "first_")
+        if not hasattr(self, "first_"):
+            self.first_ = True
         if is_classifier:
             check_classification_targets(y)
 
             # First call to partial_fit
-            if not hasattr(self, "le_"):
+            if first_call:
                 if len(y) == 1 and classes is None:
                     raise ValueError("Unable to infer classes. Should be "
                                      "provided at the first call to partial_fit.")
@@ -407,7 +410,7 @@ class BaseMondrianTree(BaseDecisionTree):
         y = np.reshape(y, (-1, 1))
 
         # First call to partial_fit
-        if not hasattr(self, "tree_"):
+        if first_call:
             self.n_features_ = X.shape[1]
             self.n_classes_ = np.array(n_classes, dtype=np.intp)
             self.n_outputs_ = 1

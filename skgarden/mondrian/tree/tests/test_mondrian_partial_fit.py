@@ -223,6 +223,7 @@ def check_partial_fit_duplicates(est, values):
     assert_array_equal(est.tree_.children_right, [-1])
     assert_array_equal(est.tree_.root, 0)
 
+
 def test_partial_fit_duplicates():
     rng = np.random.RandomState(0)
     X = rng.randn(1, 100)
@@ -235,3 +236,23 @@ def test_partial_fit_duplicates():
     mtc = MondrianTreeClassifier(random_state=0)
     mtc.partial_fit(X_dup, y, classes=[1, 2])
     check_partial_fit_duplicates(mtc, [[[0.0, 100.0]]])
+
+
+def check_fit_after_partial_fit(est, X, y):
+    est.fit(X, y)
+    assert_equal(est.tree_.n_node_samples[0], 10)
+    est.partial_fit(X, y)
+    assert_equal(est.tree_.n_node_samples[est.tree_.root], 10)
+    est.partial_fit(X, y)
+    assert_equal(est.tree_.n_node_samples[est.tree_.root], 20)
+
+
+def test_fit_after_partial_fit():
+    rng = np.random.RandomState(0)
+    X = rng.randn(10, 5)
+    y = np.floor(rng.randn(10))
+    mtr = MondrianTreeRegressor(random_state=0)
+    check_fit_after_partial_fit(mtr, X, y)
+
+    mtc = MondrianTreeClassifier(random_state=0)
+    check_fit_after_partial_fit(mtc, X, y)
