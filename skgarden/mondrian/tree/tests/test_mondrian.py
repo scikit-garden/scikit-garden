@@ -261,33 +261,33 @@ def load_scaled_boston():
     return X_train, X_test, y_train, y_test
 
 
+def check_weighted_decision_path_train(est, X):
+    leaf_nodes = est.apply(X)
+    weights_sparse = est.weighted_decision_path(X)
+    assert_array_equal(weights_sparse.data, np.ones(X.shape[0]))
+    assert_array_equal(weights_sparse.indices, leaf_nodes)
+    assert_array_equal(weights_sparse.indptr, np.arange(X.shape[0] + 1))
+
+
 def test_weighted_decision_path_train():
     """
     Test the implementation of weighted_decision_path when all test points
     are in train points.
     """
-    X_train, _, y_train, _ = load_scaled_boston()
-    n_train = X_train.shape[0]
-
     # Test that when all samples are in the training data all weights
     # should be concentrated at the leaf.
+    X_train, _, y_train, _ = load_scaled_boston()
+    y_train = np.round(y_train)
     for est in estimators:
-        if isinstance(est, ClassifierMixin):
-            est.fit(X_train, np.round(y_train))
-        else:
-            est.fit(X_train, y_train)
-        leaf_nodes = est.apply(X_train)
-        weights_sparse = est.weighted_decision_path(X_train)
-        assert_array_equal(weights_sparse.data, np.ones(n_train))
-        assert_array_equal(weights_sparse.indices, leaf_nodes)
-        assert_array_equal(weights_sparse.indptr, np.arange(n_train + 1))
+        clone_est = clone(est)
+        clone_est.fit(X_train, np.round(y_train))
+        check_weighted_decision_path_train(clone_est, X_train)
+
+        clone_est.partial_fit(X_train, np.round(y_train))
+        check_weighted_decision_path_train(clone_est, X_train)
 
 
-def test_weighted_decision_path_test_regression():
-    X_train, X_test, y_train, y_test = load_scaled_boston()
-    n_train = X_train.shape[0]
-    mtr = MondrianTreeRegressor(random_state=0)
-    mtr.fit(X_train, y_train)
+def check_weighted_decision_path_regression(mtr, X_test):
     weights = mtr.weighted_decision_path(X_test)
     node_means = mtr.tree_.mean
     node_variances = mtr.tree_.variance
@@ -311,14 +311,16 @@ def test_weighted_decision_path_test_regression():
     assert_array_almost_equal(variances1, std2**2, 3)
 
 
-def test_weighted_decision_path_test_classif():
+def test_weighted_decision_path_regression():
     X_train, X_test, y_train, y_test = load_scaled_boston()
-    y_train = np.round(y_train)
-    y_test = np.round(y_test)
-    n_train = X_train.shape[0]
+    mtr = MondrianTreeRegressor(random_state=0)
+    mtr.fit(X_train, y_train)
+    check_weighted_decision_path_regression(mtr, X_test)
+    mtr.partial_fit(X_train, y_train)
+    check_weighted_decision_path_regression(mtr, X_test)
 
-    mtc = MondrianTreeClassifier(random_state=0)
-    mtc.fit(X_train, np.round(y_train))
+
+def check_weighted_decision_path_classif(mtc, X_test):
     weights = mtc.weighted_decision_path(X_test)
     node_probas = (
         mtc.tree_.value[:, 0, :] / np.expand_dims(mtc.tree_.n_node_samples, axis=1)
@@ -333,6 +335,19 @@ def test_weighted_decision_path_test_classif():
 
     probas2 = mtc.predict_proba(X_test)
     assert_array_almost_equal(probas1, probas2, 5)
+
+
+def test_weighted_decision_path_classif():
+    X_train, X_test, y_train, y_test = load_scaled_boston()
+    y_train = np.round(y_train)
+    y_test = np.round(y_test)
+
+    mtc = MondrianTreeClassifier(random_state=0)
+    mtc.fit(X_train, np.round(y_train))
+    check_weighted_decision_path_classif(mtc, X_test)
+
+    mtc.partial_fit(X_train, np.round(y_train))
+    check_weighted_decision_path_classif(mtc, X_test)
 
 
 def test_std_positive():

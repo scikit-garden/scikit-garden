@@ -1029,20 +1029,21 @@ cdef class Tree:
         cdef DTYPE_t parent_tau
         cdef DTYPE_t delta
         cdef DTYPE_t eta
-        cdef SIZE_t f_ind
         cdef DTYPE_t X_val
         cdef DTYPE_t p_s
         cdef DTYPE_t p_nsy
+        cdef SIZE_t f_ind
+        cdef SIZE_t curr_node_id
 
         with nogil:
             for i in range(n_samples):
                 p_nsy = 1.0
-                node = self.nodes
                 parent_tau = 0.0
-
                 indptr_ptr[i + 1] = indptr_ptr[i]
 
-                # Add all external nodes
+                curr_node_id = self.root
+                node = &self.nodes[curr_node_id]
+
                 while node.left_child != _TREE_LEAF:
 
                     delta = node.tau - parent_tau
@@ -1056,20 +1057,20 @@ cdef class Tree:
                     p_s = 1 - exp(-delta*eta)
 
                     if p_s > 0:
-                        # ... and node.right_child != _TREE_LEAF:
-                        indices_ptr[indptr_ptr[i + 1]] = <SIZE_t>(node - self.nodes)
+                        indices_ptr[indptr_ptr[i + 1]] = curr_node_id
                         values_ptr[indptr_ptr[i + 1]] = p_s * p_nsy
                         indptr_ptr[i + 1] += 1
 
+                    p_nsy *= (1 - p_s)
                     if X_ptr[X_sample_stride * i +
                              X_fx_stride * node.feature] <= node.threshold:
-                        node = &self.nodes[node.left_child]
+                        curr_node_id = node.left_child
                     else:
-                        node = &self.nodes[node.right_child]
-                    p_nsy *= (1 - p_s)
+                        curr_node_id = node.right_child
+                    node = &self.nodes[curr_node_id]
 
                 # Add the leave node
-                indices_ptr[indptr_ptr[i + 1]] = <SIZE_t>(node - self.nodes)
+                indices_ptr[indptr_ptr[i + 1]] = curr_node_id
                 values_ptr[indptr_ptr[i + 1]] = p_nsy
                 indptr_ptr[i + 1] += 1
 
