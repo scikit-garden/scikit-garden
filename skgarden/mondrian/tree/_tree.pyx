@@ -963,21 +963,28 @@ cdef class Tree:
         # Initialize auxiliary data-structure
         cdef Node* node = NULL
         cdef SIZE_t i = 0
+        cdef SIZE_t curr_node_id
 
         with nogil:
             for i in range(n_samples):
-                node = &self.nodes[self.root]
-                # While node not a leaf
-                while node.left_child != _TREE_LEAF:
-                    # ... and node.right_child != _TREE_LEAF:
+                curr_node_id = self.root
+
+                while True:
+
+                    node = &self.nodes[curr_node_id]
+
                     if X_ptr[X_sample_stride * i +
                              X_fx_stride * node.feature] <= node.threshold:
-                        node = &self.nodes[node.left_child]
+
+                        if node.left_child == _TREE_LEAF:
+                            break
+                        curr_node_id = node.left_child
+
                     else:
-                        node = &self.nodes[node.right_child]
-
-                out_ptr[i] = <SIZE_t>(node - self.nodes)  # node offset
-
+                        if node.right_child == _TREE_LEAF:
+                            break
+                        curr_node_id = node.right_child
+                out_ptr[i] = curr_node_id
         return out
 
     cpdef object decision_path(self, object X):
@@ -1073,8 +1080,6 @@ cdef class Tree:
 
         return out
 
-
-
     cdef inline object _decision_path_dense(self, object X):
         """Finds the decision path (=node) for each sample in X."""
 
@@ -1105,27 +1110,26 @@ cdef class Tree:
         # Initialize auxiliary data-structure
         cdef Node* node = NULL
         cdef SIZE_t i = 0
+        cdef SIZE_t curr_node_id
 
         with nogil:
             for i in range(n_samples):
-                node = self.nodes
+                curr_node_id = self.root
                 indptr_ptr[i + 1] = indptr_ptr[i]
 
                 # Add all external nodes
-                while node.left_child != _TREE_LEAF:
+                while curr_node_id != _TREE_LEAF:
+                    node = &self.nodes[curr_node_id]
+
                     # ... and node.right_child != _TREE_LEAF:
                     indices_ptr[indptr_ptr[i + 1]] = <SIZE_t>(node - self.nodes)
                     indptr_ptr[i + 1] += 1
 
                     if X_ptr[X_sample_stride * i +
                              X_fx_stride * node.feature] <= node.threshold:
-                        node = &self.nodes[node.left_child]
+                        curr_node_id = node.left_child
                     else:
-                        node = &self.nodes[node.right_child]
-
-                # Add the leave node
-                indices_ptr[indptr_ptr[i + 1]] = <SIZE_t>(node - self.nodes)
-                indptr_ptr[i + 1] += 1
+                        curr_node_id = node.right_child
 
         indices = indices[:indptr[n_samples]]
         cdef np.ndarray[SIZE_t] data = np.ones(shape=len(indices),
