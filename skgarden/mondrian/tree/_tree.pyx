@@ -538,12 +538,17 @@ cdef class Tree:
         self.capacity = capacity
         return 0
 
-    cdef void _update_bounds_node(self, SIZE_t node_ind, SIZE_t prev_node_ind,
-                                  DTYPE_t* X_ptr, SIZE_t X_start, SIZE_t X_f_stride):
+    cdef void update_node_extent(self, SIZE_t node_ind, SIZE_t child_ind,
+                                 DTYPE_t* X_ptr, SIZE_t X_start, SIZE_t X_f_stride):
+        """
+        Updates the lower_bound and given_bound of the node at node_ind.
+        The lower bound is the minimum of the lower bound at child_ind
+        and the value of X_ptr.
+        """
         cdef SIZE_t f_ind
         cdef DTYPE_t x_val
         cdef Node* node = &self.nodes[node_ind]
-        cdef Node* prev_node = &self.nodes[prev_node_ind]
+        cdef Node* prev_node = &self.nodes[child_ind]
 
         for f_ind in range(self.n_features):
             x_val = X_ptr[X_start + X_f_stride*f_ind]
@@ -590,7 +595,18 @@ cdef class Tree:
                                   DOUBLE_t weighted_n_node_samples, DOUBLE_t impurity,
                                   DOUBLE_t variance, SIZE_t X_start,
                                   SIZE_t X_f_stride, DTYPE_t* X_ptr,
-                                  SIZE_t prev_node_ind=-1):
+                                  SIZE_t child_ind=-1):
+        """
+        Sets the left_child, right_child, feature, threshold, time of split,
+        number of samples, impurity, variance of the node at node_ind.
+
+        If child_ind is not provided, the node at node_ind is assumed to be a
+        leaf node with X_ptr[X_start: X_start+n_features*X_f_stride]
+
+        If child ind is provided, the node at node_ind is assumed to be
+        the parent of the node at child_ind and the leaf node with
+        X_ptr[X_start: X_start + n_features*X_f_stride]
+        """
         cdef Node* node = &self.nodes[node_ind]
         cdef Node* prev_node
         cdef DTYPE_t x_val
@@ -608,14 +624,14 @@ cdef class Tree:
         node.lower_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
         node.upper_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
 
-        # If prev_node is -1, its a leaf, else update the extent of each node.
-        if prev_node_ind == -1:
+        # If child_ind is -1, its a leaf, else update the extent of each node.
+        if child_ind == -1:
             for f_ind in range(self.n_features):
                 x_val = X_ptr[X_start + X_f_stride*f_ind]
                 node.lower_bounds[f_ind] = node.upper_bounds[f_ind] = x_val
         else:
-            self._update_bounds_node(
-                node_ind, prev_node_ind, X_ptr, X_start, X_f_stride)
+            self.update_node_extent(
+                node_ind, child_ind, X_ptr, X_start, X_f_stride)
 
     cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_f_stride):
         """
@@ -671,7 +687,6 @@ cdef class Tree:
         cdef int c_ind
         cdef SIZE_t rc
 
-
         while True:
             curr_node = &self.nodes[curr_id]
 
@@ -719,6 +734,7 @@ cdef class Tree:
                     raise MemoryError()
 
                 curr_node = &self.nodes[curr_id]
+
                 # Step 7-8: Create new leaf node j'' and update value.
                 self.set_node_attributes(
                     new_child_id, _TREE_LEAF, _TREE_LEAF, _TREE_UNDEFINED,
@@ -754,7 +770,7 @@ cdef class Tree:
                 break
             else:
                 # Step 10: Update extent of node j
-                self._update_bounds_node(curr_id, curr_id, X_ptr, X_start, X_f_stride)
+                self.update_node_extent(curr_id, curr_id, X_ptr, X_start, X_f_stride)
                 self._update_node_info(curr_id, curr_id, y_ptr, y_start)
                 curr_node.n_node_samples += 1
                 curr_node.weighted_n_node_samples += 1
