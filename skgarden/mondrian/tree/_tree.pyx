@@ -557,7 +557,10 @@ cdef class Tree:
 
     cdef void _update_node_info(self, SIZE_t parent_id, SIZE_t child_id,
                                 DOUBLE_t* y_ptr, SIZE_t y_start):
-
+        """
+        Update the value at node parent_ind given the values at node
+        child_id and y_ptr[y_start]
+        """
         cdef SIZE_t is_regression = self.n_classes[0] == 1
         cdef SIZE_t child_ptr = child_id*self.value_stride
         cdef SIZE_t parent_ptr = parent_id*self.value_stride
@@ -644,7 +647,6 @@ cdef class Tree:
             else:
                 self.value[val_ptr + <SIZE_t> y_ptr[y_start]] = 1.0
 
-
     cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_f_stride):
         """
         Parameters
@@ -662,6 +664,16 @@ cdef class Tree:
 
     cdef void extend(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_start,
                      SIZE_t X_f_stride, SIZE_t y_start, UINT32_t random_state):
+        """
+        Extends the tree given a new sample.
+        (X_ptr[X_start: X_start+ n_features*X_f_stride], y_ptr[y_start])
+
+        References
+        ----------
+        1. Algorithm 5.5, Decision Trees and Forests: A Probabilistic Perspective,
+           Balaji Lakshminarayanan
+           http://www.gatsby.ucl.ac.uk/~balaji/balaji-phd-thesis.pdf
+        """
         # Traverse the tree
         cdef SIZE_t curr_id = self.root
         cdef SIZE_t parent_id = -1
@@ -671,7 +683,6 @@ cdef class Tree:
         cdef SIZE_t new_parent_id
         cdef SIZE_t f_ind
         cdef SIZE_t feature
-        cdef SIZE_t val_ptr
         cdef SIZE_t delta
 
         cdef Node* curr_node
@@ -685,31 +696,36 @@ cdef class Tree:
         cdef DTYPE_t* e_u = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
         cdef DTYPE_t* extent = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
         cdef DTYPE_t E
-        cdef DTYPE_t new_sum
         cdef DTYPE_t tau_parent = 0.0
         cdef DTYPE_t threshold
         cdef DTYPE_t l_b
         cdef DTYPE_t u_b
-        cdef int is_regression = self.n_classes[0] == 1
         cdef int c_ind
         cdef SIZE_t rc
 
         while True:
             curr_node = &self.nodes[curr_id]
 
-            # Step 1 in 5.6: Calculate e^l, e^u and rate.
+            # Step 1: Calculate e^l, e^u and rate.
+            # If x belongs to the bounding box, this is zero.
             new_rate = 0.0
             for f_ind in range(self.n_features):
-                x = X_ptr[X_start + f_ind * X_f_stride]
+                x = X_ptr[X_start + f_ind*X_f_stride]
                 e_l[f_ind] = fmax(curr_node.lower_bounds[f_ind] - x, 0)
                 e_u[f_ind] = fmax(x - curr_node.upper_bounds[f_ind], 0)
                 extent[f_ind] = e_l[f_ind] + e_u[f_ind]
                 new_rate += extent[f_ind]
 
-            # Step 2 in 5.6: Calculate E
+            # Step 2: Sample E from an exponential distribution.
             E = rand_exponential(new_rate, &random_state)
 
+            # Step 3: Induce split.
+            # 2 new nodes are created.
+            # 1. A child node with the new sample.
+            # 2. A parent node with the new child node and the node at
+            # curr_id as children.
             if tau_parent + E < curr_node.tau:
+
                 new_child_id = self.node_count
                 new_parent_id = self.node_count + 1
 
@@ -740,6 +756,8 @@ cdef class Tree:
                 if rc == -1:
                     raise MemoryError()
 
+                # xxx: We need to get the pointer to curr_id again
+                # because of the resizing above.
                 curr_node = &self.nodes[curr_id]
 
                 # Step 7-8: Create new leaf node j'' and update value.
@@ -748,7 +766,7 @@ cdef class Tree:
                     _TREE_UNDEFINED, INFINITY, 1, 1, 0.0, 0.0, X_start,
                     X_f_stride, X_ptr, y_ptr, -1, y_start)
 
-                # Step 6 - Create new parent node j'
+                # Step 6 : Create new parent node j'
                 self.set_node_attributes(
                     new_parent_id, left_child, right_child, delta, xi,
                     tau_parent + E, curr_node.n_node_samples + 1,
@@ -756,10 +774,12 @@ cdef class Tree:
                     X_f_stride, X_ptr, y_ptr, curr_id)
                 self._update_node_info(new_parent_id, curr_id, y_ptr, y_start)
 
-                # New root.
+                # New root if curr_id is root.
                 if curr_id == self.root:
                     self.root = new_parent_id
                 else:
+                    # Link to the newly created node j' (new_parent_id)
+                    # as the child of the parent of node j (curr_id)
                     parent_node = &self.nodes[parent_id]
                     if parent_node.left_child == curr_id:
                         parent_node.left_child = new_parent_id
@@ -768,8 +788,12 @@ cdef class Tree:
                 self.max_depth += 1
                 self.node_count += 2
                 break
+
+            # Absorb new sample into curr_id and Traverse further down the
+            # tree.
             else:
-                # Step 10: Update extent of node j
+                # Step 10: Update extent, value at node curr_id and increment
+                # the number of samples.
                 self.update_node_extent(curr_id, curr_id, X_ptr, X_start, X_f_stride)
                 self._update_node_info(curr_id, curr_id, y_ptr, y_start)
                 curr_node.n_node_samples += 1
@@ -777,6 +801,7 @@ cdef class Tree:
 
                 if curr_node.left_child == -1:
                     break
+
                 # Step 12 - 13: Recurse down the tree.
                 parent_id = curr_id
                 if X_ptr[X_start + curr_node.feature*X_f_stride] < curr_node.threshold:

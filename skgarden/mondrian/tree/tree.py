@@ -377,7 +377,7 @@ class BaseMondrianTree(BaseDecisionTree):
     """
     def partial_fit(self, X, y, classes=None):
         """
-        Supports incremental building of Mondrian Trees.
+        Incremental building of Mondrian Trees.
 
         Parameters
         ----------
@@ -393,6 +393,10 @@ class BaseMondrianTree(BaseDecisionTree):
             problem, if not provided this is inferred from y.
             This is taken into account for only the first call to
             partial_fit and ignored for subsequent calls.
+
+        Returns
+        -------
+        self: instance of MondrianTree
         """
         random_state = check_random_state(self.random_state)
         X, y = check_X_y(X, y, dtype=DTYPE, multi_output=False, order="C")
