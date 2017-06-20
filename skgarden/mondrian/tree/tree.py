@@ -376,6 +376,28 @@ class BaseMondrianTree(BaseDecisionTree):
         by `np.random`.
     """
     def partial_fit(self, X, y, classes=None):
+        """
+        Incremental building of Mondrian Trees.
+
+        Parameters
+        ----------
+        X : array_like, shape = [n_samples, n_features]
+            The input samples. Internally, it will be converted to
+            ``dtype=np.float32``
+
+        y: array_like, shape = [n_samples]
+            Input targets.
+
+        classes: array_like, shape = [n_classes]
+            Ignored for a regression problem. For a classification
+            problem, if not provided this is inferred from y.
+            This is taken into account for only the first call to
+            partial_fit and ignored for subsequent calls.
+
+        Returns
+        -------
+        self: instance of MondrianTree
+        """
         random_state = check_random_state(self.random_state)
         X, y = check_X_y(X, y, dtype=DTYPE, multi_output=False, order="C")
         is_classifier = isinstance(self, ClassifierMixin)
@@ -383,9 +405,12 @@ class BaseMondrianTree(BaseDecisionTree):
         max_depth = ((2 ** 31) - 1 if self.max_depth is None
                      else self.max_depth)
 
+        # This is necessary to rebuild the tree if partial_fit is called
+        # after fit.
         first_call = not hasattr(self, "first_")
         if not hasattr(self, "first_"):
             self.first_ = True
+
         if is_classifier:
             check_classification_targets(y)
 
@@ -409,7 +434,7 @@ class BaseMondrianTree(BaseDecisionTree):
         y = np.array(y, dtype=np.float64)
         y = np.reshape(y, (-1, 1))
 
-        # First call to partial_fit
+        # First call to partial_fit, initalize tree
         if first_call:
             self.n_features_ = X.shape[1]
             self.n_classes_ = np.array(n_classes, dtype=np.intp)
@@ -429,7 +454,7 @@ class BaseMondrianTree(BaseDecisionTree):
 
         Parameters
         ----------
-        X : array_like or sparse matrix, shape = [n_samples, n_features]
+        X : array_like, shape = [n_samples, n_features]
             The input samples. Internally, it will be converted to
             ``dtype=np.float32`` and if a sparse matrix is provided
             to a sparse ``csr_matrix``.
