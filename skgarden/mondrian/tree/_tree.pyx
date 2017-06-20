@@ -135,7 +135,8 @@ cdef class PartialFitTreeBuilder(TreeBuilder):
 
         cdef UINT32_t rand_r_state = self.random_state.randint(0, RAND_R_MAX)
         cdef int n_samples = X.shape[0]
-        cdef int n_features = X.shape[1]
+
+        # Allocate memory for tree.
         cdef int init_capacity
         if tree.max_depth <= 10:
             init_capacity = (2 ** (tree.max_depth + 1)) - 1
@@ -145,23 +146,24 @@ cdef class PartialFitTreeBuilder(TreeBuilder):
 
         cdef np.ndarray X_ndarray = X
         cdef DTYPE_t* X_ptr = <DTYPE_t*> X_ndarray.data
-        cdef SIZE_t X_s_stride = X.strides[0] / X.itemsize
-        cdef SIZE_t X_f_stride = X.strides[1] / X.itemsize
         cdef DOUBLE_t* y_ptr = <DOUBLE_t*> y.data
+        cdef SIZE_t X_f_stride = X.strides[1] / X.itemsize
+        cdef SIZE_t X_s_stride = X.strides[0] / X.itemsize
         cdef SIZE_t y_stride = y.strides[0] / y.itemsize
         cdef SIZE_t sample_ind
         cdef SIZE_t start
-        cdef Node* node
 
+        # Initialize the tree when the first sample is inserted.
         if tree.node_count == 0:
             tree._init(X_ptr, y_ptr, X_f_stride)
             start = 1
         else:
             start = 0
 
-        for i in range(start, n_samples):
-            tree.extend(X_ptr, y_ptr, i*X_s_stride, X_f_stride,
-                        i*y_stride, rand_r_state)
+        for sample_ind in range(start, n_samples):
+            tree.extend(X_ptr, y_ptr, sample_ind*X_s_stride,
+                        X_f_stride,
+                        sample_ind*y_stride, rand_r_state)
 
 # Depth first builder ---------------------------------------------------------
 
@@ -616,7 +618,15 @@ cdef class Tree:
                 node_ind, prev_node_ind, X_ptr, X_start, X_f_stride)
 
     cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_f_stride):
+        """
+        Parameters
+        ----------
+        X_ptr: DTYPE_t*, pointer to X
 
+        y_ptr: DTYPE_t* pointer to y
+
+        X_f_stride: SIZE_t, stride to reach consecutive feature.
+        """
         self.set_node_attributes(0, _TREE_LEAF, _TREE_LEAF, _TREE_UNDEFINED,
                                  _TREE_UNDEFINED, INFINITY, 1, 1, 0.0, 0.0,
                                  0, X_f_stride, X_ptr)
