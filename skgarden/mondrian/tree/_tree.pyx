@@ -595,7 +595,8 @@ cdef class Tree:
                                   DOUBLE_t weighted_n_node_samples, DOUBLE_t impurity,
                                   DOUBLE_t variance, SIZE_t X_start,
                                   SIZE_t X_f_stride, DTYPE_t* X_ptr,
-                                  SIZE_t child_ind=-1):
+                                  DOUBLE_t* y_ptr, SIZE_t child_ind=-1,
+                                  SIZE_t y_start=0):
         """
         Sets the left_child, right_child, feature, threshold, time of split,
         number of samples, impurity, variance of the node at node_ind.
@@ -611,6 +612,7 @@ cdef class Tree:
         cdef Node* prev_node
         cdef DTYPE_t x_val
         cdef SIZE_t f_ind
+        cdef SIZE_t val_ptr = node_ind*self.value_stride
 
         node.left_child = left_child
         node.right_child = right_child
@@ -624,6 +626,7 @@ cdef class Tree:
         node.lower_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
         node.upper_bounds = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
 
+        # Set bounds.
         # If child_ind is -1, its a leaf, else update the extent of each node.
         if child_ind == -1:
             for f_ind in range(self.n_features):
@@ -632,6 +635,15 @@ cdef class Tree:
         else:
             self.update_node_extent(
                 node_ind, child_ind, X_ptr, X_start, X_f_stride)
+
+        # Set value at node_ind
+        if child_ind == -1:
+            # Regression
+            if self.n_classes[0] == 1:
+                self.value[val_ptr] = y_ptr[y_start]
+            else:
+                self.value[val_ptr + <SIZE_t> y_ptr[y_start]] = 1.0
+
 
     cdef void _init(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_f_stride):
         """
@@ -645,12 +657,7 @@ cdef class Tree:
         """
         self.set_node_attributes(0, _TREE_LEAF, _TREE_LEAF, _TREE_UNDEFINED,
                                  _TREE_UNDEFINED, INFINITY, 1, 1, 0.0, 0.0,
-                                 0, X_f_stride, X_ptr)
-        # Regression
-        if self.n_classes[0] == 1:
-            self.value[0] = y_ptr[0]
-        else:
-            self.value[<SIZE_t> y_ptr[0]] = 1.0
+                                 0, X_f_stride, X_ptr, y_ptr)
         self.node_count += 1
 
     cdef void extend(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_start,
@@ -739,21 +746,14 @@ cdef class Tree:
                 self.set_node_attributes(
                     new_child_id, _TREE_LEAF, _TREE_LEAF, _TREE_UNDEFINED,
                     _TREE_UNDEFINED, INFINITY, 1, 1, 0.0, 0.0, X_start,
-                    X_f_stride, X_ptr)
-
-                # Update value data-structure for Regression
-                val_ptr = new_child_id*self.value_stride
-                if is_regression:
-                    self.value[val_ptr] = y_ptr[y_start]
-                else:
-                    self.value[val_ptr + <SIZE_t> y_ptr[y_start]] = 1.0
+                    X_f_stride, X_ptr, y_ptr, -1, y_start)
 
                 # Step 6 - Create new parent node j'
                 self.set_node_attributes(
                     new_parent_id, left_child, right_child, delta, xi,
                     tau_parent + E, curr_node.n_node_samples + 1,
                     curr_node.weighted_n_node_samples + 1, 0.0, 0.0, X_start,
-                    X_f_stride, X_ptr, curr_id)
+                    X_f_stride, X_ptr, y_ptr, curr_id)
                 self._update_node_info(new_parent_id, curr_id, y_ptr, y_start)
 
                 # New root.

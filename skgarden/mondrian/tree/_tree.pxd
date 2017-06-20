@@ -90,7 +90,8 @@ cdef class Tree:
                                   DOUBLE_t weighted_n_node_samples, DOUBLE_t impurity,
                                   DOUBLE_t variance, SIZE_t X_start,
                                   SIZE_t X_f_stride, DTYPE_t* X_ptr,
-                                  SIZE_t child_ind=?)
+                                  DOUBLE_t* y_ptr, SIZE_t child_ind=?,
+                                  SIZE_t y_start=?)
     cdef void update_node_extent(self, SIZE_t node_ind, SIZE_t child_ind,
                                  DTYPE_t* X_ptr, SIZE_t X_start, SIZE_t X_f_stride)
     cdef void _update_node_info(self, SIZE_t parent_id, SIZE_t child_id,
