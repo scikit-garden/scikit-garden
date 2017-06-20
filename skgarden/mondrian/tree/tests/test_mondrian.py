@@ -21,6 +21,7 @@ from sklearn.utils.testing import assert_almost_equal
 from sklearn.utils.testing import assert_false
 from sklearn.utils.testing import assert_greater
 from sklearn.utils.testing import assert_less
+from sklearn.utils.testing import assert_true
 
 from skgarden.mondrian import MondrianTreeClassifier
 from skgarden.mondrian import MondrianTreeRegressor
@@ -446,3 +447,21 @@ def test_tree_attributes():
     check_tree_attributes(X, y, 0, mr.tree_)
     mr.partial_fit(X, y)
     check_tree_attributes(X, y, mr.tree_.root, mr.tree_, False)
+
+
+def test_apply():
+    X_train, X_test, y_train, y_test = load_scaled_boston()
+    y_train = np.round(y_train)
+    for est in estimators:
+        est_clone = clone(est)
+        est_clone.fit(X_train, y_train)
+        train_leaves = est_clone.tree_.children_left[est_clone.apply(X_train)]
+        test_leaves = est_clone.tree_.children_left[est_clone.apply(X_test)]
+        assert_true(np.all(train_leaves == -1))
+        assert_true(np.all(test_leaves == -1))
+
+        est_clone.partial_fit(X_train, y_train)
+        train_leaves = est_clone.tree_.children_left[est_clone.apply(X_train)]
+        test_leaves = est_clone.tree_.children_left[est_clone.apply(X_test)]
+        assert_true(np.all(train_leaves == -1))
+        assert_true(np.all(test_leaves == -1))
