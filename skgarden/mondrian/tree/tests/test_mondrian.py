@@ -3,6 +3,7 @@ At fit time, the mondrian splitter works independent of labels.
 So a lot of things can be factored between the MondrianTreeRegressor and
 MondrianTreeClassifier
 """
+import pickle
 import numpy as np
 from sklearn.base import clone
 from sklearn.base import ClassifierMixin
@@ -18,6 +19,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.utils.testing import assert_array_equal
 from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.utils.testing import assert_almost_equal
+from sklearn.utils.testing import assert_equal
 from sklearn.utils.testing import assert_false
 from sklearn.utils.testing import assert_greater
 from sklearn.utils.testing import assert_less
@@ -251,8 +253,8 @@ def test_dimension_location():
 def load_scaled_boston():
     boston = load_boston()
     X, y = boston.data, boston.target
-    n_train = 100
-    n_test = 100
+    n_train = 400
+    n_test = 400
     X_train, y_train = X[:n_train], y[:n_train]
     X_test, y_test = X[-n_test:], y[-n_test:]
     minmax = MinMaxScaler()
@@ -480,3 +482,23 @@ def test_apply():
         test_leaves = est_clone.tree_.children_left[est_clone.apply(X_test)]
         assert_true(np.all(train_leaves == -1))
         assert_true(np.all(test_leaves == -1))
+
+def check_pickle(est, X, y):
+    score1 = est.score(X, y)
+    pickle_obj = pickle.dumps(est)
+
+    est2 = pickle.loads(pickle_obj)
+    assert_equal(type(est2), est.__class__)
+    score2 = est2.score(X, y)
+    assert_equal(score1, score2)
+
+
+def test_pickle():
+    X, _, y, _ = load_scaled_boston()
+    y = np.round(y)
+
+    for est in estimators:
+        est.fit(X, y)
+        check_pickle(est, X, y)
+        est.partial_fit(X, y)
+        check_pickle(est, X, y)
