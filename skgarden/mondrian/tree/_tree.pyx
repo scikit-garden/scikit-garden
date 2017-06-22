@@ -461,12 +461,14 @@ cdef class Tree:
         d["node_count"] = self.node_count
         d["nodes"] = self._get_node_ndarray()
         d["values"] = self._get_value_ndarray()
+        d["root"] = self.root
         return d
 
     def __setstate__(self, d):
         """Setstate re-implementation, for unpickling."""
         self.max_depth = d["max_depth"]
         self.node_count = d["node_count"]
+        self.root = d["root"]
 
         if 'nodes' not in d:
             raise ValueError('You have loaded Tree version which '
