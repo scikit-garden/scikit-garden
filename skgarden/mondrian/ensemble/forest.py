@@ -52,7 +52,7 @@ class BaseMondrian(object):
     # from sklearn.forest
     def partial_fit(self, X, y, classes=None):
         """
-        Incremental building of Mondrian Trees.
+        Incremental building of Mondrian Forests.
 
         Parameters
         ----------
@@ -71,7 +71,7 @@ class BaseMondrian(object):
 
         Returns
         -------
-        self: instance of MondrianTree
+        self: instance of MondrianForest
         """
         X, y = check_X_y(X, y, dtype=np.float32, multi_output=False)
         random_state = check_random_state(self.random_state)
@@ -250,6 +250,31 @@ class MondrianForestRegressor(ForestRegressor, BaseMondrian):
         std **= 0.5
         return ensemble_mean, std
 
+    def partial_fit(self, X, y):
+        """
+        Incremental building of Mondrian Forest Regressors.
+
+        Parameters
+        ----------
+        X : array_like, shape = [n_samples, n_features]
+            The input samples. Internally, it will be converted to
+            ``dtype=np.float32``
+
+        y: array_like, shape = [n_samples]
+            Input targets.
+
+        classes: array_like, shape = [n_classes]
+            Ignored for a regression problem. For a classification
+            problem, if not provided this is inferred from y.
+            This is taken into account for only the first call to
+            partial_fit and ignored for subsequent calls.
+
+        Returns
+        -------
+        self: instance of MondrianForestClassifier
+        """
+        return super(MondrianForestRegressor, self).partial_fit(X, y)
+
 
 class MondrianForestClassifier(ForestClassifier, BaseMondrian):
     """
@@ -329,3 +354,29 @@ class MondrianForestClassifier(ForestClassifier, BaseMondrian):
         """
         X, y = check_X_y(X, y, dtype=np.float32, multi_output=False)
         return super(MondrianForestClassifier, self).fit(X, y)
+
+    def partial_fit(self, X, y, classes=None):
+        """
+        Incremental building of Mondrian Forest Classifiers.
+
+        Parameters
+        ----------
+        X : array_like, shape = [n_samples, n_features]
+            The input samples. Internally, it will be converted to
+            ``dtype=np.float32``
+
+        y: array_like, shape = [n_samples]
+            Input targets.
+
+        classes: array_like, shape = [n_classes]
+            Ignored for a regression problem. For a classification
+            problem, if not provided this is inferred from y.
+            This is taken into account for only the first call to
+            partial_fit and ignored for subsequent calls.
+
+        Returns
+        -------
+        self: instance of MondrianForestClassifier
+        """
+        return super(MondrianForestClassifier, self).partial_fit(
+            X, y, classes=classes)
