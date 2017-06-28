@@ -440,6 +440,7 @@ class BaseMondrianTree(BaseDecisionTree):
             self.n_classes_ = np.array(n_classes, dtype=np.intp)
             self.n_outputs_ = 1
             self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
+
         builder = PartialFitTreeBuilder(
             self.min_samples_split, max_depth, random_state)
         builder.build(self.tree_, X, y)
@@ -485,6 +486,24 @@ class MondrianTreeRegressor(BaseMondrianTree, RegressorMixin):
             min_samples_split=min_samples_split,
             random_state=random_state)
 
+    def partial_fit(self, X, y):
+        """
+        Incremental building of Mondrian Tree Regressors.
+
+        Parameters
+        ----------
+        X : array_like, shape = [n_samples, n_features]
+            The input samples. Internally, it will be converted to
+            ``dtype=np.float32``
+
+        y: array_like, shape = [n_samples]
+            Input targets.
+
+        Returns
+        -------
+        self: instance of MondrianTree
+        """
+        return super(MondrianTreeRegressor, self).partial_fit(X, y)
 
 class MondrianTreeClassifier(BaseMondrianTree, ClassifierMixin):
     def __init__(self,
@@ -521,3 +540,29 @@ class MondrianTreeClassifier(BaseMondrianTree, ClassifierMixin):
         X = self._validate_X_predict(X, check_input)
 
         return self.tree_.predict(X, return_std=False, is_regression=False)[0]
+
+    def partial_fit(self, X, y, classes=None):
+        """
+        Incremental building of Mondrian Tree Classifiers.
+
+        Parameters
+        ----------
+        X : array_like, shape = [n_samples, n_features]
+            The input samples. Internally, it will be converted to
+            ``dtype=np.float32``
+
+        y: array_like, shape = [n_samples]
+            Input targets.
+
+        classes: array_like, shape = [n_classes]
+            Ignored for a regression problem. For a classification
+            problem, if not provided this is inferred from y.
+            This is taken into account for only the first call to
+            partial_fit and ignored for subsequent calls.
+
+        Returns
+        -------
+        self: instance of MondrianTree
+        """
+        return super(MondrianTreeClassifier, self).partial_fit(
+            X, y, classes=classes)

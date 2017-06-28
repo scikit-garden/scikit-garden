@@ -14,8 +14,11 @@ from ..tree import MondrianTreeClassifier
 from ..tree import MondrianTreeRegressor
 
 
-def _single_tree_pfit(tree, X, y, classes):
-    tree.partial_fit(X, y, classes)
+def _single_tree_pfit(tree, X, y, classes=None):
+    if classes is not None:
+        tree.partial_fit(X, y, classes)
+    else:
+        tree.partial_fit(X, y)
     return tree
 
 class BaseMondrian(object):
@@ -112,8 +115,12 @@ class BaseMondrian(object):
                 self.estimators_.append(tree)
 
         # XXX: Switch to threading backend when GIL is released.
-        self.estimators_ = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
-            delayed(_single_tree_pfit)(t, X, y, classes) for t in self.estimators_)
+        if isinstance(self, ClassifierMixin):
+            self.estimators_ = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+                delayed(_single_tree_pfit)(t, X, y, classes) for t in self.estimators_)
+        else:
+            self.estimators_ = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+                delayed(_single_tree_pfit)(t, X, y) for t in self.estimators_)
 
         return self
 

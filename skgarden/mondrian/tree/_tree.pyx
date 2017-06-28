@@ -140,9 +140,7 @@ cdef class PartialFitTreeBuilder(TreeBuilder):
         cdef int init_capacity
         if tree.max_depth <= 10:
             init_capacity = (2 ** (tree.max_depth + 1)) - 1
-        else:
-            init_capacity = 2047
-        tree._resize(init_capacity)
+            tree._resize(init_capacity)
 
         cdef np.ndarray X_ndarray = X
         cdef DTYPE_t* X_ptr = <DTYPE_t*> X_ndarray.data
