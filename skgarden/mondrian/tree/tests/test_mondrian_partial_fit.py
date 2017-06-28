@@ -5,6 +5,7 @@ Tests specific to incremental building of trees.
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.datasets import make_regression
+from sklearn.datasets import load_digits
 from sklearn.utils.testing import assert_almost_equal
 from sklearn.utils.testing import assert_equal
 from sklearn.utils.testing import assert_array_almost_equal
@@ -256,3 +257,35 @@ def test_fit_after_partial_fit():
 
     mtc = MondrianTreeClassifier(random_state=0)
     check_fit_after_partial_fit(mtc, X, y)
+
+
+def check_online_fit(clf, X, y, batch_size, is_clf=True):
+    start_ptr = np.arange(0, len(y), batch_size)
+    end_ptr = list(start_ptr[1:]) + [len(y)]
+
+    for start, end in zip(start_ptr, end_ptr):
+        if is_clf:
+            if start == 0:
+                classes = np.unique(y)
+            else:
+                classes = None
+            clf.partial_fit(X[start:end], y[start:end], classes=classes)
+        else:
+            clf.partial_fit(X[start:end], y[start:end])
+    assert_almost_equal(clf.score(X, y), 1.0)
+
+
+def test_partial_fit_n_samples_1000():
+    mtc = MondrianTreeClassifier(random_state=0)
+    X, y = load_digits(return_X_y=True)
+    check_online_fit(mtc, X, y, 20)
+
+    mtc = MondrianTreeClassifier(random_state=0)
+    check_online_fit(mtc, X, y, 100)
+
+    X, y = make_regression(random_state=0, n_samples=10000)
+    mtr = MondrianTreeRegressor(random_state=0)
+    check_online_fit(mtr, X, y, 100, is_clf=False)
+
+    mtr = MondrianTreeRegressor(random_state=0)
+    check_online_fit(mtr, X, y, 20, is_clf=False)
