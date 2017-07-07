@@ -161,7 +161,7 @@ cdef class PartialFitTreeBuilder(TreeBuilder):
         for sample_ind in range(start, n_samples):
             tree.extend(X_ptr, y_ptr, sample_ind*X_s_stride,
                         X_f_stride,
-                        sample_ind*y_stride, rand_r_state)
+                        sample_ind*y_stride, rand_r_state, self.max_depth)
 
 # Depth first builder ---------------------------------------------------------
 
@@ -663,7 +663,8 @@ cdef class Tree:
         self.node_count += 1
 
     cdef void extend(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_start,
-                     SIZE_t X_f_stride, SIZE_t y_start, UINT32_t random_state):
+                     SIZE_t X_f_stride, SIZE_t y_start, UINT32_t random_state,
+                     SIZE_t max_depth):
         """
         Extends the tree given a new sample.
         (X_ptr[X_start: X_start+ n_features*X_f_stride], y_ptr[y_start])
@@ -695,7 +696,7 @@ cdef class Tree:
         cdef DTYPE_t* e_l = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
         cdef DTYPE_t* e_u = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
         cdef DTYPE_t* extent = <DTYPE_t*> malloc(self.n_features * sizeof(DTYPE_t))
-        cdef DTYPE_t E
+        cdef DTYPE_t E = 0.0
         cdef DTYPE_t tau_parent = 0.0
         cdef DTYPE_t threshold
         cdef DTYPE_t l_b
@@ -707,25 +708,48 @@ cdef class Tree:
             curr_node = &self.nodes[curr_id]
 
             # Step 1: Calculate e^l, e^u and rate.
-            # If x belongs to the bounding box, this is zero.
-            new_rate = 0.0
-            for f_ind in range(self.n_features):
-                x = X_ptr[X_start + f_ind*X_f_stride]
-                e_l[f_ind] = fmax(curr_node.lower_bounds[f_ind] - x, 0)
-                e_u[f_ind] = fmax(x - curr_node.upper_bounds[f_ind], 0)
-                extent[f_ind] = e_l[f_ind] + e_u[f_ind]
-                new_rate += extent[f_ind]
+            # If x belongs to the bounding box, the rate is zero.
+            # Ignore this step, if the current tree depth is greater
+            # than or equal to max_depth because a split cannot be induced.
+            if self.max_depth < max_depth:
+                new_rate = 0.0
+                for f_ind in range(self.n_features):
+                    x = X_ptr[X_start + f_ind*X_f_stride]
+                    e_l[f_ind] = fmax(curr_node.lower_bounds[f_ind] - x, 0)
+                    e_u[f_ind] = fmax(x - curr_node.upper_bounds[f_ind], 0)
+                    extent[f_ind] = e_l[f_ind] + e_u[f_ind]
+                    new_rate += extent[f_ind]
 
-            # Step 2: Sample E from an exponential distribution.
-            E = rand_exponential(new_rate, &random_state)
+                # Step 2: Sample E from an exponential distribution.
+                E = rand_exponential(new_rate, &random_state)
+
+            # Absorb new sample into curr_id and traverse further down the
+            # tree.
+            if self.max_depth >= max_depth or tau_parent + E >= curr_node.tau:
+                # Step 10: Update extent, value at node curr_id and increment
+                # the number of samples.
+                self.update_node_extent(curr_id, curr_id, X_ptr, X_start, X_f_stride)
+                self._update_node_info(curr_id, curr_id, y_ptr, y_start)
+                curr_node.n_node_samples += 1
+                curr_node.weighted_n_node_samples += 1
+
+                if curr_node.left_child == -1:
+                    break
+
+                # Step 12 - 13: Recurse down the tree.
+                parent_id = curr_id
+                if X_ptr[X_start + curr_node.feature*X_f_stride] < curr_node.threshold:
+                    curr_id = curr_node.left_child
+                else:
+                    curr_id = curr_node.right_child
+                tau_parent = curr_node.tau
 
             # Step 3: Induce split.
             # 2 new nodes are created.
             # 1. A child node with the new sample.
             # 2. A parent node with the new child node and the node at
             # curr_id as children.
-            if tau_parent + E < curr_node.tau:
-
+            else:
                 new_child_id = self.node_count
                 new_parent_id = self.node_count + 1
 
@@ -789,26 +813,6 @@ cdef class Tree:
                 self.node_count += 2
                 break
 
-            # Absorb new sample into curr_id and Traverse further down the
-            # tree.
-            else:
-                # Step 10: Update extent, value at node curr_id and increment
-                # the number of samples.
-                self.update_node_extent(curr_id, curr_id, X_ptr, X_start, X_f_stride)
-                self._update_node_info(curr_id, curr_id, y_ptr, y_start)
-                curr_node.n_node_samples += 1
-                curr_node.weighted_n_node_samples += 1
-
-                if curr_node.left_child == -1:
-                    break
-
-                # Step 12 - 13: Recurse down the tree.
-                parent_id = curr_id
-                if X_ptr[X_start + curr_node.feature*X_f_stride] < curr_node.threshold:
-                    curr_id = curr_node.left_child
-                else:
-                    curr_id = curr_node.right_child
-                tau_parent = curr_node.tau
         free(e_l)
         free(e_u)
         free(extent)
