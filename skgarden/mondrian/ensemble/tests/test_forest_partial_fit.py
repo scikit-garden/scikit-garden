@@ -8,6 +8,7 @@ from sklearn.utils.testing import assert_greater
 
 from skgarden import MondrianForestRegressor
 from skgarden import MondrianForestClassifier
+from skgarden.mondrian.tree.tests.test_mondrian_partial_fit import check_partial_fit_max_depth
 
 
 def check_partial_fit_equivalence(size_batch, f, random_state, X, y, is_clf=False):
@@ -86,3 +87,20 @@ def test_min_samples_split():
         for est in mfc.estimators_:
             n_node_samples = est.tree_.n_node_samples[est.tree_.children_left != -1]
             assert_greater(np.min(n_node_samples) + 1, mss)
+
+
+def test_partial_fit_max_depth():
+    X_r, y_r = make_regression(n_samples=10000, random_state=0)
+    X_c, y_c = make_classification(n_samples=10000, random_state=0)
+    for d in [1, 2, 5, 10, None]:
+        mfr = MondrianForestRegressor(random_state=0, max_depth=d)
+        mfr.partial_fit(X_r[:5000], y_r[:5000])
+        mfr.partial_fit(X_r[5000:], y_r[5000:])
+        for est in mfr.estimators_:
+            check_partial_fit_max_depth(est, d, X_r.shape[0])
+
+        # mfc = MondrianForestClassifier(random_state=0, max_depth=d)
+        # mfc.partial_fit(X_c[:X_c.shape[0] // 2], y_c[:y_c.shape[0] // 2])
+        # mfc.partial_fit(X_c[X_c.shape[0] // 2:], y_c[y_c.shape[0] // 2:])
+        # for est in mfc.estimators_:
+        #     check_partial_fit_max_depth(est, d, X_c.shape[0])
