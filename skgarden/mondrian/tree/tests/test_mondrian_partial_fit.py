@@ -3,6 +3,7 @@ Tests specific to incremental building of trees.
 """
 
 import numpy as np
+from sklearn.base import ClassifierMixin
 from sklearn.datasets import make_classification
 from sklearn.datasets import make_regression
 from sklearn.datasets import load_digits
@@ -307,3 +308,42 @@ def test_min_samples_split():
         mtc.partial_fit(X_c[X_c.shape[0] // 2:], y_c[X_c.shape[0] // 2:])
         n_node_samples = mtc.tree_.n_node_samples[mtc.tree_.children_left != -1]
         assert_greater(np.min(n_node_samples) + 1, mss)
+
+
+def _max_depth(tree, node_id):
+    l_c = tree.children_left[node_id]
+    r_c = tree.children_right[node_id]
+    if l_c == -1:
+        return 0
+    return 1 + max(_max_depth(tree, l_c), _max_depth(tree, r_c))
+
+
+def max_depth(tree):
+    if len(tree.children_left) == 1:
+        return 1
+    return _max_depth(tree, tree.root)
+
+
+def check_partial_fit_max_depth(est, depth, n_samples):
+    tree = est.tree_
+    leaves = tree.children_left == -1
+    assert_equal(np.sum(tree.n_node_samples[leaves]), n_samples)
+    if isinstance(est, ClassifierMixin):
+        assert_equal(np.sum(tree.value[leaves]), n_samples)
+    if depth is not None:
+        assert_greater(depth + 1, max_depth(tree))
+
+
+def test_partial_fit_max_depth():
+    X_r, y_r = make_regression(n_samples=10000, random_state=0)
+    X_c, y_c = make_classification(n_samples=10000, random_state=0)
+    for d in [1, 2, 5, 10, None]:
+        mtr = MondrianTreeRegressor(random_state=0, max_depth=d)
+        mtr.partial_fit(X_r[:5000], y_r[:5000])
+        mtr.partial_fit(X_r[5000:], y_r[5000:])
+        check_partial_fit_max_depth(mtr, d, X_r.shape[0])
+
+        mtc = MondrianTreeClassifier(random_state=0, max_depth=d)
+        mtc.partial_fit(X_c[:X_c.shape[0] // 2], y_c[:y_c.shape[0] // 2])
+        mtc.partial_fit(X_c[X_c.shape[0] // 2:], y_c[y_c.shape[0] // 2:])
+        check_partial_fit_max_depth(mtc, d, X_c.shape[0])
