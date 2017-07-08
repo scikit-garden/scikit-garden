@@ -161,7 +161,8 @@ cdef class PartialFitTreeBuilder(TreeBuilder):
         for sample_ind in range(start, n_samples):
             tree.extend(X_ptr, y_ptr, sample_ind*X_s_stride,
                         X_f_stride,
-                        sample_ind*y_stride, rand_r_state)
+                        sample_ind*y_stride, rand_r_state,
+                        self.min_samples_split)
 
 # Depth first builder ---------------------------------------------------------
 
@@ -663,7 +664,8 @@ cdef class Tree:
         self.node_count += 1
 
     cdef void extend(self, DTYPE_t* X_ptr, DOUBLE_t* y_ptr, SIZE_t X_start,
-                     SIZE_t X_f_stride, SIZE_t y_start, UINT32_t random_state):
+                     SIZE_t X_f_stride, SIZE_t y_start, UINT32_t random_state,
+                     SIZE_t min_samples_split):
         """
         Extends the tree given a new sample.
         (X_ptr[X_start: X_start+ n_features*X_f_stride], y_ptr[y_start])
@@ -724,7 +726,8 @@ cdef class Tree:
             # 1. A child node with the new sample.
             # 2. A parent node with the new child node and the node at
             # curr_id as children.
-            if tau_parent + E < curr_node.tau:
+            if (tau_parent + E < curr_node.tau and
+                curr_node.n_node_samples + 1 >= min_samples_split):
 
                 new_child_id = self.node_count
                 new_parent_id = self.node_count + 1
