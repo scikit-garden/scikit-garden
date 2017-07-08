@@ -289,3 +289,21 @@ def test_partial_fit_n_samples_1000():
 
     mtr = MondrianTreeRegressor(random_state=0)
     check_online_fit(mtr, X, y, 20, is_clf=False)
+
+
+def test_min_samples_split():
+    X_c, y_c = load_digits(return_X_y=True)
+    X_r, y_r = make_regression(n_samples=10000, random_state=0)
+
+    for mss in [2, 4, 10, 20]:
+        mtr = MondrianTreeRegressor(random_state=0, min_samples_split=mss)
+        mtr.partial_fit(X_r[: X_r.shape[0] // 2], y_r[: X_r.shape[0] // 2])
+        mtr.partial_fit(X_r[X_r.shape[0] // 2:], y_r[X_r.shape[0] // 2:])
+        n_node_samples = mtr.tree_.n_node_samples[mtr.tree_.children_left != -1]
+        assert_greater(np.min(n_node_samples) + 1, mss)
+
+        mtc = MondrianTreeClassifier(random_state=0, min_samples_split=mss)
+        mtc.partial_fit(X_c[: X_c.shape[0] // 2], y_c[: X_c.shape[0] // 2])
+        mtc.partial_fit(X_c[X_c.shape[0] // 2:], y_c[X_c.shape[0] // 2:])
+        n_node_samples = mtc.tree_.n_node_samples[mtc.tree_.children_left != -1]
+        assert_greater(np.min(n_node_samples) + 1, mss)
