@@ -502,3 +502,24 @@ def test_pickle():
         check_pickle(est, X, y)
         est.partial_fit(X, y)
         check_pickle(est, X, y)
+
+
+def test_tree_identical_labels():
+    rng = np.random.RandomState(0)
+    for est in estimators:
+        X = rng.randn(100, 5)
+        y = np.ones(100)
+        c_est = clone(est)
+        c_est.set_params(min_samples_split=2, max_depth=None)
+        c_est.fit(X, y)
+        assert_equal(c_est.tree_.n_node_samples, [100])
+        if isinstance(c_est, ClassifierMixin):
+            assert_equal(c_est.tree_.value, [[[100]]])
+        else:
+            assert_equal(c_est.tree_.value, [[[1.0]]])
+
+        X = np.reshape(np.linspace(0.0, 1.0, 100), (-1, 1))
+        y = np.array([0.0]*50 + [1.0]*50)
+        c_est.fit(X, y)
+        leaf_ids = c_est.tree_.children_left == -1
+        assert_true(np.any(c_est.tree_.n_node_samples[leaf_ids] > 2))

@@ -3,6 +3,7 @@ import pickle
 import numpy as np
 
 from sklearn.base import clone
+from sklearn.base import ClassifierMixin
 from sklearn.datasets import load_boston
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelBinarizer
@@ -108,7 +109,6 @@ def test_min_samples_split():
             n_samples = est.tree_.n_node_samples
             leaves = est.tree_.children_left == -1
             assert_true(np.all(n_samples[~leaves] >= min_samples_split))
-            assert_true(np.all(n_samples[leaves] < min_samples_split))
 
 
 def test_memory_layout():
@@ -255,3 +255,25 @@ def test_proba_classif_convergence():
     check_proba_classif_convergence(mfc, X_train, y_train)
     mfc.partial_fit(X_train, y_train)
     check_proba_classif_convergence(mfc, X_train, y_train)
+
+
+def test_tree_identical_labels():
+    rng = np.random.RandomState(0)
+    for ensemble in ensembles:
+        X = rng.randn(100, 5)
+        y = np.ones(100)
+        ensemble.fit(X, y)
+        for est in ensemble.estimators_:
+            assert_equal(est.tree_.n_node_samples, [100])
+
+            if isinstance(est, ClassifierMixin):
+                assert_equal(est.tree_.value, [[[100]]])
+            else:
+                assert_equal(est.tree_.value, [[[1.0]]])
+
+        X = np.reshape(np.linspace(0.0, 1.0, 100), (-1, 1))
+        y = np.array([0.0]*50 + [1.0]*50)
+        ensemble.fit(X, y)
+        for est in ensemble.estimators_:
+            leaf_ids = est.tree_.children_left == -1
+            assert_true(np.any(est.tree_.n_node_samples[leaf_ids] > 2))

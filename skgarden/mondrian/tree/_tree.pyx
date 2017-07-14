@@ -247,18 +247,21 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
                 n_node_samples = end - start
                 splitter.node_reset(start, end, &weighted_n_node_samples)
 
-                is_leaf = (depth >= max_depth or
-                           n_node_samples < min_samples_split)
-
                 if first:
                     impurity = splitter.node_impurity()
                     first = 0
+
+                is_leaf = (depth >= max_depth or
+                           n_node_samples < min_samples_split)
 
                 if not is_leaf:
                     is_leaf = splitter.node_split(impurity, &split, &n_constant_features)
                     is_leaf = is_leaf or (split.pos >= end)
                 else:
                     splitter.set_bounds()
+
+                # Check if the node is pure.
+                is_leaf = is_leaf or splitter.criterion.is_pure()
 
                 node_id = tree._add_node(parent, is_left, is_leaf, split.feature,
                                          split.threshold, impurity, n_node_samples,

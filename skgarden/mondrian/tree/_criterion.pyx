@@ -208,6 +208,12 @@ cdef class Criterion:
                           - (self.weighted_n_left /
                              self.weighted_n_node_samples * impurity_left)))
 
+    cdef bint is_pure(self) nogil:
+        """
+        Returns if a node is pure, i.e if samples[start:end] are identical.
+        """
+        pass
+
 
 cdef class RegressionCriterion(Criterion):
     """Abstract regression criterion.
@@ -510,6 +516,9 @@ cdef class MSE(RegressionCriterion):
         impurity_left[0] /= self.n_outputs
         impurity_right[0] /= self.n_outputs
 
+    cdef bint is_pure(self) nogil:
+        return self.node_impurity() == 0
+
 
 cdef class ClassificationCriterion(Criterion):
     """Abstract criterion for classification."""
@@ -808,7 +817,6 @@ cdef class ClassificationCriterion(Criterion):
         dest : double pointer
             The memory address which we will save the node value into.
         """
-
         cdef double* sum_total = self.sum_total
         cdef SIZE_t* n_classes = self.n_classes
         cdef SIZE_t k
@@ -817,3 +825,21 @@ cdef class ClassificationCriterion(Criterion):
             memcpy(dest, sum_total, n_classes[k] * sizeof(double))
             dest += self.sum_stride
             sum_total += self.sum_stride
+
+    cdef bint is_pure(self) nogil:
+        cdef bint is_pure_node = True
+        cdef bint is_pure_output = False
+        cdef SIZE_t c_ind
+        cdef SIZE_t k
+        cdef double* sum_total = self.sum_total
+
+        for k in range(self.n_outputs):
+            is_pure_output = False
+            for c_ind in range(self.n_classes[k]):
+                if sum_total[c_ind] == self.n_node_samples:
+                    is_pure_output = True
+                    break
+            if not is_pure_output:
+                is_pure_node = False
+                break
+        return is_pure_node
