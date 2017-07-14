@@ -442,6 +442,7 @@ class BaseMondrianTree(BaseDecisionTree):
             self.n_outputs_ = 1
             self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
 
+        # Initialize criterion and splitter instances.
         criterion = self.criterion
         if not isinstance(criterion, Criterion):
             if is_classification:
@@ -454,8 +455,13 @@ class BaseMondrianTree(BaseDecisionTree):
         if not isinstance(self.splitter, Splitter):
             splitter = SPLITTERS[self.splitter](criterion, random_state)
 
-        builder = PartialFitTreeBuilder(
-            splitter, self.min_samples_split, max_depth, random_state)
+        # First-call to partial_fit should be equivalent to fit.
+        if first_call:
+            builder = DepthFirstTreeBuilder(
+                splitter, self.min_samples_split, max_depth)
+        else:
+            builder = PartialFitTreeBuilder(
+                splitter, self.min_samples_split, max_depth, random_state)
         builder.build(self.tree_, X, y)
         return self
 
