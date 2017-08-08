@@ -45,7 +45,7 @@ The estimators in Scikit-Garden are Scikit-Learn compatible and can serve as a d
 
 ```python
 from sklearn.datasets import load_boston
-X, y = make_boston()
+X, y = load_boston()
 
 ### Use MondrianForests for variance estimation
 from skgarden import MondrianForestRegressor
