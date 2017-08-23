@@ -19,8 +19,6 @@
 from cpython cimport Py_INCREF, PyObject
 
 from libc.math cimport exp
-from libc.math cimport fmax
-from libc.math cimport fmin
 from libc.math cimport sqrt
 from libc.stdlib cimport free
 from libc.stdlib cimport malloc
@@ -87,6 +85,14 @@ NODE_DTYPE = np.dtype({
         <Py_ssize_t> &(<Node*> NULL).variance,
     ]
 })
+
+cdef inline double fmax(double left, double right) nogil:
+    return left if left > right else right
+
+
+cdef inline double fmin(double left, double right) nogil:
+    return left if left < right else right
+
 
 # =============================================================================
 # TreeBuilder
