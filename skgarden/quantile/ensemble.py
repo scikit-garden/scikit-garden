@@ -1,3 +1,4 @@
+from __future__ import division
 import numpy as np
 from numpy import ma
 from sklearn.ensemble import ExtraTreesRegressor
@@ -94,7 +95,7 @@ class BaseForestQuantileRegressor(ForestRegressor):
             for curr_leaf in np.unique(y_train_leaves):
                 y_ind = y_train_leaves == curr_leaf
                 self.y_weights_[i, y_ind] = (
-                    est_weights[y_ind] / np.sum(est_weights[y_ind]).astype(float))
+                    est_weights[y_ind] / np.sum(est_weights[y_ind]))
 
             self.y_train_leaves_[i, bootstrap_indices] = y_train_leaves[bootstrap_indices]
         return self
