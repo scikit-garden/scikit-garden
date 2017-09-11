@@ -1,11 +1,11 @@
 #! /usr/bin/env python
 
-import sys
+from distutils.version import LooseVersion
 import os
-import setuptools
-import numpy
-from numpy.distutils.core import setup
-from setuptools import find_packages
+
+import numpy as np
+from setuptools import Extension, find_packages, setup
+
 
 DISTNAME = 'scikit-garden'
 DESCRIPTION = "A garden of scikit-learn compatible trees"
@@ -15,26 +15,41 @@ MAINTAINER_EMAIL = 'mks542@nyu.edu'
 LICENSE = 'new BSD'
 VERSION = '0.1.3'
 
+CYTHON_MIN_VERSION = '0.23'
 
-def configuration(parent_package='', top_path=None):
-    if os.path.exists('MANIFEST'):
-        os.remove('MANIFEST')
 
-    from numpy.distutils.misc_util import Configuration
-    config = Configuration(None, parent_package, top_path)
-    config.add_subpackage('skgarden')
+message = ('Please install cython with a version >= {0} in order '
+           'to build a scikit-garden development version.').format(
+           CYTHON_MIN_VERSION)
+try:
+    import Cython
+    if LooseVersion(Cython.__version__) < CYTHON_MIN_VERSION:
+        message += ' Your version of Cython was {0}.'.format(
+            Cython.__version__)
+        raise ValueError(message)
+    from Cython.Build import cythonize
+except ImportError as exc:
+    exc.args += (message,)
+    raise
 
-    return config
+libraries = []
+if os.name == 'posix':
+    libraries.append('m')
+
+extensions = []
+for name in ['_tree', '_splitter', '_criterion', '_utils']:
+    extensions.append(Extension(
+        'skgarden.mondrian.tree.{}'.format(name),
+        sources=['skgarden/mondrian/tree/{}.pyx'.format(name)],
+        include_dirs=[np.get_include()],
+        libraries=libraries,
+        extra_compile_args=['-O3'],
+    ))
+extensions = cythonize(extensions)
+
 
 if __name__ == "__main__":
-
-    old_path = os.getcwd()
-    local_path = os.path.dirname(os.path.abspath(sys.argv[0]))
-
-    os.chdir(local_path)
-    sys.path.insert(0, local_path)
-    setup(configuration=configuration,
-          name=DISTNAME,
+    setup(name=DISTNAME,
           maintainer=MAINTAINER,
           maintainer_email=MAINTAINER_EMAIL,
           packages=find_packages(),
@@ -58,4 +73,5 @@ if __name__ == "__main__":
               'Operating System :: MacOS'
             ],
           install_requires=["numpy", "scipy", "scikit-learn>=0.18", "cython"],
-          setup_requires=["cython"])
+          setup_requires=["cython"],
+          ext_modules=extensions)
