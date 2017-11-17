@@ -93,6 +93,50 @@ cdef inline double fmax(double left, double right) nogil:
 cdef inline double fmin(double left, double right) nogil:
     return left if left < right else right
 
+cdef object pickle_node(Tree tree, Node node):
+    d = {}
+    d['left_child']                 = node.left_child
+    d['right_child']                = node.right_child
+    d['feature']                    = node.feature
+    d['threshold']                  = node.threshold
+    d['impurity']                   = node.impurity
+    d['n_node_samples']             = node.n_node_samples
+    d['weighted_n_node_samples']    = node.weighted_n_node_samples
+    d['tau']                        = node.tau
+    d['variance']                   = node.variance
+
+    cdef np.npy_intp bounds_shape[1]
+    bounds_shape[0] = <np.npy_intp>tree.n_features
+    d['lower_bounds']               = np.PyArray_SimpleNewFromData(
+                                        1, bounds_shape, np.NPY_FLOAT, node.lower_bounds)
+    d['upper_bounds']               = np.PyArray_SimpleNewFromData(
+                                        1, bounds_shape, np.NPY_FLOAT, node.upper_bounds)
+
+    return d
+
+cdef Node unpickle_node(Tree tree, object d):
+    cdef Node node
+    node.left_child                 = d['left_child']
+    node.right_child                = d['right_child']
+    node.feature                    = d['feature']
+    node.threshold                  = d['threshold']
+    node.impurity                   = d['impurity']
+    node.n_node_samples             = d['n_node_samples']
+    node.weighted_n_node_samples    = d['weighted_n_node_samples']
+    node.lower_bounds               = <DTYPE_t *>malloc(tree.n_features*sizeof(DTYPE_t))
+    node.upper_bounds               = <DTYPE_t *>malloc(tree.n_features*sizeof(DTYPE_t))
+    node.tau                        = d['tau']
+    node.variance                   = d['variance']
+
+    cdef np.ndarray[DTYPE_t, ndim=1, mode="c"] lower_bounds_array = \
+        np.asarray(d['lower_bounds'], order="C")
+    cdef np.ndarray[DTYPE_t, ndim=1, mode="c"] upper_bounds_array = \
+        np.asarray(d['upper_bounds'], order="C")
+    memcpy(node.lower_bounds, <DTYPE_t *>&lower_bounds_array[0], tree.n_features*sizeof(DTYPE_t))
+    memcpy(node.upper_bounds, <DTYPE_t *>&upper_bounds_array[0], tree.n_features*sizeof(DTYPE_t))
+
+    return node
+
 
 # =============================================================================
 # TreeBuilder
@@ -451,6 +495,9 @@ cdef class Tree:
     def __dealloc__(self):
         """Destructor."""
         # Free all inner structures
+        for i in range(self.node_count):
+            free(self.nodes[i].lower_bounds)
+            free(self.nodes[i].upper_bounds)
         free(self.n_classes)
         free(self.value)
         free(self.nodes)
@@ -467,7 +514,9 @@ cdef class Tree:
         # capacity is infered during the __setstate__ using nodes
         d["max_depth"] = self.max_depth
         d["node_count"] = self.node_count
-        d["nodes"] = self._get_node_ndarray()
+        d["nodes"] = []
+        for i in range(self.node_count):
+            d["nodes"].append(pickle_node(self, self.nodes[i]))
         d["values"] = self._get_value_ndarray()
         d["root"] = self.root
         return d
@@ -482,24 +531,16 @@ cdef class Tree:
             raise ValueError('You have loaded Tree version which '
                              'cannot be imported')
 
-        node_ndarray = d['nodes']
-        value_ndarray = d['values']
-
-        value_shape = (node_ndarray.shape[0], self.n_outputs,
-                       self.max_n_classes)
-        if (node_ndarray.ndim != 1 or
-                node_ndarray.dtype != NODE_DTYPE or
-                not node_ndarray.flags.c_contiguous or
-                value_ndarray.shape != value_shape or
-                not value_ndarray.flags.c_contiguous or
-                value_ndarray.dtype != np.float64):
-            raise ValueError('Did not recognise loaded array layout')
-
-        self.capacity = node_ndarray.shape[0]
+        nodes = d['nodes']
+        self.capacity = len(nodes)
         if self._resize_c(self.capacity) != 0:
             raise MemoryError("resizing tree to %d" % self.capacity)
-        nodes = memcpy(self.nodes, (<np.ndarray> node_ndarray).data,
-                       self.capacity * sizeof(Node))
+        for i, node in enumerate(nodes):
+            self.nodes[i] = unpickle_node(self, node)
+
+        value_ndarray = d['values']
+        value_shape = (self.capacity, self.n_outputs,
+                       self.max_n_classes)
         value = memcpy(self.value, (<np.ndarray> value_ndarray).data,
                        self.capacity * self.value_stride * sizeof(double))
 
