@@ -116,11 +116,17 @@ class BaseMondrian(object):
 
         # XXX: Switch to threading backend when GIL is released.
         if isinstance(self, ClassifierMixin):
-            self.estimators_ = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
-                delayed(_single_tree_pfit)(t, X, y, classes) for t in self.estimators_)
+            if self.n_jobs == 1:
+                self.estimators_ = [_single_tree_pfit(t, X, y, classes) for t in self.estimators_]
+            else:
+                self.estimators_ = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+                    delayed(_single_tree_pfit)(t, X, y, classes) for t in self.estimators_)
         else:
-            self.estimators_ = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
-                delayed(_single_tree_pfit)(t, X, y) for t in self.estimators_)
+            if self.n_jobs == 1:
+                self.estimators_ = [_single_tree_pfit(t, X, y) for t in self.estimators_]
+            else:
+                self.estimators_ = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+                    delayed(_single_tree_pfit)(t, X, y) for t in self.estimators_)
 
         return self
 
