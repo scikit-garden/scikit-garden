@@ -95,8 +95,14 @@ cdef class Tree:
                                   SIZE_t y_start=?)
     cdef void update_node_extent(self, SIZE_t node_ind, SIZE_t child_ind,
                                  DTYPE_t* X_ptr, SIZE_t X_start, SIZE_t X_f_stride)
+
     cdef void _update_node_info(self, SIZE_t parent_id, SIZE_t child_id,
                                 DOUBLE_t* y_ptr, SIZE_t y_start)
+
+cpdef void mpi_send_tree(Tree tree, object comm, int dst)
+cpdef Tree mpi_recv_tree(int n_features, np.ndarray[SIZE_t, ndim=1] n_classes, int n_outputs,
+                        object comm, int src)
+
 # =============================================================================
 # Tree builder
 # =============================================================================

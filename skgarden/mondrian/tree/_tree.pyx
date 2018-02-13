@@ -1279,3 +1279,137 @@ cdef class Tree:
         Py_INCREF(self)
         arr.base = <PyObject*> self
         return arr
+
+cdef SIZE_t mpi_tree_node_buf_size(Tree tree):
+    return (
+        sizeof((<Node *>NULL).left_child) +
+        sizeof((<Node *>NULL).right_child) +
+        sizeof((<Node *>NULL).feature) +
+        sizeof((<Node *>NULL).threshold) +
+        sizeof((<Node *>NULL).impurity) +
+        sizeof((<Node *>NULL).n_node_samples) +
+        sizeof((<Node *>NULL).weighted_n_node_samples) +
+        sizeof((<Node *>NULL).tau) +
+        sizeof((<Node *>NULL).variance) +
+        sizeof((<Node *>NULL).lower_bounds[0]) * tree.n_features +
+        sizeof((<Node *>NULL).upper_bounds[0]) * tree.n_features
+    )
+
+cdef SIZE_t mpi_tree_value_buf_size(Tree tree):
+    return sizeof(tree.value[0]) * tree.node_count*tree.n_outputs*tree.max_n_classes
+
+cdef SIZE_t mpi_tree_buf_size(Tree tree):
+    return mpi_tree_node_buf_size(tree)*tree.node_count + mpi_tree_value_buf_size(tree)
+
+cpdef void mpi_send_tree(Tree tree, object comm, int dst):
+
+    # First send the node_count so the peer knows how much to read
+    cdef np.npy_intp dim = sizeof(tree.node_count)
+    cdef np.ndarray node_count_arr = np.PyArray_SimpleNewFromData(1, &dim, np.NPY_BYTE, &tree.node_count)
+    comm.Send(node_count_arr, dst)
+
+    cdef np.ndarray buf = \
+        np.empty(mpi_tree_buf_size(tree), dtype=np.dtype('b'))
+
+    cdef char *cursor = <char *>buf.data
+
+    cdef Node *node
+    for i in range(tree.node_count):
+        node = &tree.nodes[i]
+
+        memcpy(cursor, &node.left_child, sizeof(node.left_child))
+        cursor += sizeof(node.left_child)
+
+        memcpy(cursor, &node.right_child, sizeof(node.right_child))
+        cursor += sizeof(node.right_child)
+
+        memcpy(cursor, &node.feature, sizeof(node.feature))
+        cursor += sizeof(node.feature)
+
+        memcpy(cursor, &node.threshold, sizeof(node.threshold))
+        cursor += sizeof(node.threshold)
+
+        memcpy(cursor, &node.impurity, sizeof(node.impurity))
+        cursor += sizeof(node.impurity)
+
+        memcpy(cursor, &node.n_node_samples, sizeof(node.n_node_samples))
+        cursor += sizeof(node.n_node_samples)
+
+        memcpy(cursor, &node.weighted_n_node_samples, sizeof(node.weighted_n_node_samples))
+        cursor += sizeof(node.weighted_n_node_samples)
+
+        memcpy(cursor, &node.tau, sizeof(node.tau))
+        cursor += sizeof(node.tau)
+
+        memcpy(cursor, &node.variance, sizeof(node.variance))
+        cursor += sizeof(node.variance)
+
+        memcpy(cursor, node.lower_bounds, sizeof(node.lower_bounds[0])*tree.n_features)
+        cursor += sizeof(node.lower_bounds[0])*tree.n_features
+
+        memcpy(cursor, node.upper_bounds, sizeof(node.upper_bounds[0])*tree.n_features)
+        cursor += sizeof(node.upper_bounds[0])*tree.n_features
+
+    memcpy(cursor, tree.value, mpi_tree_value_buf_size(tree))
+
+    comm.Send(buf, dst)
+
+cpdef Tree mpi_recv_tree(int n_features, np.ndarray[SIZE_t, ndim=1] n_classes, int n_outputs,
+                        object comm, int src):
+    tree = Tree(n_features, n_classes, n_outputs)
+
+    # Get the node_count and resize the tree appropriately
+    cdef SIZE_t node_count
+    cdef np.npy_intp dim = sizeof(node_count)
+    cdef np.ndarray node_count_arr = np.PyArray_SimpleNewFromData(1, &dim, np.NPY_BYTE, &node_count)
+    comm.Recv(node_count_arr, source=src)
+    tree._resize(node_count)
+    tree.node_count = node_count
+
+    # Get the data buffer
+    cdef np.ndarray buf = np.empty(mpi_tree_buf_size(tree), dtype=np.dtype('b'))
+    comm.Recv(buf, source=src)
+    cdef char *cursor = <char *>buf.data
+
+    cdef Node *node
+    for i in range(tree.node_count):
+        node = &tree.nodes[i]
+        node.lower_bounds = <DTYPE_t *>malloc(sizeof(DTYPE_t)*tree.n_features)
+        node.upper_bounds = <DTYPE_t *>malloc(sizeof(DTYPE_t)*tree.n_features)
+
+        memcpy(&node.left_child, cursor, sizeof(node.left_child))
+        cursor += sizeof(node.left_child)
+
+        memcpy(&node.right_child, cursor, sizeof(node.right_child))
+        cursor += sizeof(node.right_child)
+
+        memcpy(&node.feature, cursor, sizeof(node.feature))
+        cursor += sizeof(node.feature)
+
+        memcpy(&node.threshold, cursor, sizeof(node.threshold))
+        cursor += sizeof(node.threshold)
+
+        memcpy(&node.impurity, cursor, sizeof(node.impurity))
+        cursor += sizeof(node.impurity)
+
+        memcpy(&node.n_node_samples, cursor, sizeof(node.n_node_samples))
+        cursor += sizeof(node.n_node_samples)
+
+        memcpy(&node.weighted_n_node_samples, cursor, sizeof(node.weighted_n_node_samples))
+        cursor += sizeof(node.weighted_n_node_samples)
+
+        memcpy(&node.tau, cursor, sizeof(node.tau))
+        cursor += sizeof(node.tau)
+
+        memcpy(&node.variance, cursor, sizeof(node.variance))
+        cursor += sizeof(node.variance)
+
+        memcpy(node.lower_bounds, cursor, sizeof(node.lower_bounds[0])*tree.n_features)
+        cursor += sizeof(node.lower_bounds[0])*tree.n_features
+
+        memcpy(node.upper_bounds, cursor, sizeof(node.upper_bounds[0])*tree.n_features)
+        cursor += sizeof(node.upper_bounds[0])*tree.n_features
+
+    memcpy(tree.value, cursor, mpi_tree_value_buf_size(tree))
+
+    return tree

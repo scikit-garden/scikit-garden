@@ -505,6 +505,19 @@ class MondrianTreeRegressor(BaseMondrianTree, RegressorMixin):
         """
         return super(MondrianTreeRegressor, self).partial_fit(X, y)
 
+def mpi_send(tree, comm, dst):
+    _tree.mpi_send_tree(tree.tree_, comm, dst)
+
+def mpi_recv_regressor(n_features, n_outputs, comm, src):
+    tree = MondrianTreeRegressor()
+    tree.n_features_ = n_features
+    tree.classes_ = [None]*n_outputs
+    tree.n_classes_ = [1]*n_outputs
+    tree.n_outputs_ = n_outputs
+    tree.tree_ = _tree.mpi_recv_tree(
+        tree.n_features_, np.array(tree.n_classes_), tree.n_outputs_, comm, src)
+    return tree
+
 class MondrianTreeClassifier(BaseMondrianTree, ClassifierMixin):
     def __init__(self,
                  max_depth=None,
