@@ -46,6 +46,17 @@ cdef extern from "numpy/arrayobject.h":
                                 np.npy_intp* strides,
                                 void* data, int flags, object obj)
 
+cdef extern from "zlib.h":
+    ctypedef unsigned char Bytef
+    ctypedef unsigned long uLongf
+    ctypedef long unsigned uLong
+
+    int Z_OK
+
+    int compressBound(uLong)
+    int compress2(Bytef *, uLongf *, Bytef *, uLong, int)
+    int uncompress(Bytef *, uLongf *, const Bytef *, uLong);
+
 # =============================================================================
 # Types and constants
 # =============================================================================
@@ -1301,15 +1312,24 @@ cdef SIZE_t mpi_tree_value_buf_size(Tree tree):
 cdef SIZE_t mpi_tree_buf_size(Tree tree):
     return mpi_tree_node_buf_size(tree)*tree.node_count + mpi_tree_value_buf_size(tree)
 
+cdef void mpi_send_size(SIZE_t size, object comm, int dst):
+    cdef np.npy_intp dim = sizeof(SIZE_t)
+    cdef np.ndarray arr = np.PyArray_SimpleNewFromData(1, &dim, np.NPY_BYTE, &size)
+    comm.Send(arr, dst)
+
+cdef SIZE_t mpi_recv_size(object comm, int src):
+    cdef SIZE_t size
+    cdef np.npy_intp dim = sizeof(SIZE_t)
+    cdef np.ndarray arr = np.PyArray_SimpleNewFromData(1, &dim, np.NPY_BYTE, &size)
+    comm.Recv(arr, source=src)
+    return size
+
 cpdef void mpi_send_tree(Tree tree, object comm, int dst):
 
     # First send the node_count so the peer knows how much to read
-    cdef np.npy_intp dim = sizeof(tree.node_count)
-    cdef np.ndarray node_count_arr = np.PyArray_SimpleNewFromData(1, &dim, np.NPY_BYTE, &tree.node_count)
-    comm.Send(node_count_arr, dst)
+    mpi_send_size(tree.node_count, comm, dst)
 
-    cdef np.ndarray buf = \
-        np.empty(mpi_tree_buf_size(tree), dtype=np.dtype('b'))
+    cdef np.ndarray buf = np.empty(mpi_tree_buf_size(tree), dtype=np.dtype('b'))
 
     cdef char *cursor = <char *>buf.data
 
@@ -1352,23 +1372,47 @@ cpdef void mpi_send_tree(Tree tree, object comm, int dst):
 
     memcpy(cursor, tree.value, mpi_tree_value_buf_size(tree))
 
-    comm.Send(buf, dst)
+    cdef uLongf buf_size = buf.shape[0]
+    cdef uLongf compressed_buf_size = compressBound(buf_size)
+    cdef np.ndarray compressed_buf = np.empty(compressed_buf_size, dtype=np.dtype('b'))
+
+    cdef int err = compress2(
+        <Bytef *>compressed_buf.data, &compressed_buf_size, <const Bytef *>buf.data, buf_size, 1)
+    if err != Z_OK:
+        raise RuntimeError('zlib error on compress2: {}'.format(int(err)))
+
+    compressed_buf.resize(compressed_buf_size)
+    mpi_send_size(compressed_buf_size, comm, dst)
+    comm.Send(compressed_buf, dst)
 
 cpdef Tree mpi_recv_tree(int n_features, np.ndarray[SIZE_t, ndim=1] n_classes, int n_outputs,
                         object comm, int src):
     tree = Tree(n_features, n_classes, n_outputs)
 
     # Get the node_count and resize the tree appropriately
-    cdef SIZE_t node_count
-    cdef np.npy_intp dim = sizeof(node_count)
-    cdef np.ndarray node_count_arr = np.PyArray_SimpleNewFromData(1, &dim, np.NPY_BYTE, &node_count)
-    comm.Recv(node_count_arr, source=src)
+    cdef SIZE_t node_count = mpi_recv_size(comm, src)
     tree._resize(node_count)
     tree.node_count = node_count
 
+    # Get the size of the compressed buffer
+    cdef uLongf compressed_buf_size = mpi_recv_size(comm, src)
+
     # Get the data buffer
-    cdef np.ndarray buf = np.empty(mpi_tree_buf_size(tree), dtype=np.dtype('b'))
-    comm.Recv(buf, source=src)
+    cdef np.ndarray compressed_buf = np.empty(compressed_buf_size, dtype=np.dtype('b'))
+    comm.Recv(compressed_buf, source=src)
+
+    # Unzip the buffer
+    cdef uLongf buf_size = mpi_tree_buf_size(tree)
+    cdef uLongf expected_buf_size = buf_size
+    cdef np.ndarray buf = np.empty(buf_size, dtype=np.dtype('b'))
+    cdef int err = uncompress(
+        <Bytef *>buf.data, &buf_size, <const Bytef *>compressed_buf.data, compressed_buf_size)
+    if err != Z_OK:
+        raise RuntimeError('zlib error on uncompress: {}'.format(int(err)))
+    if buf_size != expected_buf_size:
+        raise RuntimeError('unexpected buf_size! expected {}, got {}'.format(
+            int(expected_buf_size), int(buf_size)))
+
     cdef char *cursor = <char *>buf.data
 
     cdef Node *node
