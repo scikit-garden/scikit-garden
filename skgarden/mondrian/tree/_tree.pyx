@@ -29,6 +29,8 @@ import numpy as np
 cimport numpy as np
 np.import_array()
 
+import time
+
 from scipy.sparse import csr_matrix
 
 from ._utils cimport Stack
@@ -1312,22 +1314,28 @@ cdef SIZE_t mpi_tree_value_buf_size(Tree tree):
 cdef SIZE_t mpi_tree_buf_size(Tree tree):
     return mpi_tree_node_buf_size(tree)*tree.node_count + mpi_tree_value_buf_size(tree)
 
-cdef void mpi_send_size(SIZE_t size, object comm, int dst):
-    cdef np.npy_intp dim = sizeof(SIZE_t)
-    cdef np.ndarray arr = np.PyArray_SimpleNewFromData(1, &dim, np.NPY_BYTE, &size)
+cdef struct MPITreeHeader:
+    SIZE_t node_count
+    SIZE_t compressed_buf_size
+
+cdef void mpi_send_tree_header(object comm, int dst, MPITreeHeader h):
+    cdef np.npy_intp dim = sizeof(h)
+    cdef np.ndarray arr = np.PyArray_SimpleNewFromData(1, &dim, np.NPY_BYTE, &h)
     comm.Send(arr, dst)
 
-cdef SIZE_t mpi_recv_size(object comm, int src):
-    cdef SIZE_t size
-    cdef np.npy_intp dim = sizeof(SIZE_t)
-    cdef np.ndarray arr = np.PyArray_SimpleNewFromData(1, &dim, np.NPY_BYTE, &size)
+cdef MPITreeHeader mpi_recv_tree_header(object comm, int src):
+    cdef MPITreeHeader h
+    cdef np.npy_intp dim = sizeof(h)
+    cdef np.ndarray arr = np.PyArray_SimpleNewFromData(1, &dim, np.NPY_BYTE, &h)
     comm.Recv(arr, source=src)
-    return size
+    return h
 
-cpdef void mpi_send_tree(Tree tree, object comm, int dst):
+cpdef object mpi_send_tree(object comm, int dst, Tree tree, int compression, bint profile):
+    if compression < 0 or compression > 9:
+        raise ValueError('compression must be in [0, 9] (got {})'.format(int(compression)))
 
-    # First send the node_count so the peer knows how much to read
-    mpi_send_size(tree.node_count, comm, dst)
+    if profile:
+        t_start = time.time()
 
     cdef np.ndarray buf = np.empty(mpi_tree_buf_size(tree), dtype=np.dtype('b'))
 
@@ -1376,37 +1384,51 @@ cpdef void mpi_send_tree(Tree tree, object comm, int dst):
     cdef uLongf compressed_buf_size = compressBound(buf_size)
     cdef np.ndarray compressed_buf = np.empty(compressed_buf_size, dtype=np.dtype('b'))
 
-    cdef int err = compress2(
-        <Bytef *>compressed_buf.data, &compressed_buf_size, <const Bytef *>buf.data, buf_size, 1)
+    cdef int err = compress2(<Bytef *>compressed_buf.data, &compressed_buf_size,
+                             <const Bytef *>buf.data, buf_size, compression)
     if err != Z_OK:
         raise RuntimeError('zlib error on compress2: {}'.format(int(err)))
-
     compressed_buf.resize(compressed_buf_size)
-    mpi_send_size(compressed_buf_size, comm, dst)
+
+    cdef MPITreeHeader h
+    h.node_count = tree.node_count
+    h.compressed_buf_size = compressed_buf_size
+
+    if profile:
+        sent_bytes = sizeof(h) + compressed_buf_size
+        t_sent = time.time()
+
+    mpi_send_tree_header(comm, dst, h)
     comm.Send(compressed_buf, dst)
 
-cpdef Tree mpi_recv_tree(int n_features, np.ndarray[SIZE_t, ndim=1] n_classes, int n_outputs,
-                        object comm, int src):
+    if profile:
+        return (t_start, t_sent, sent_bytes)
+    else:
+        return None
+
+cpdef object mpi_recv_tree(object comm, int src,
+                           int n_features, np.ndarray[SIZE_t, ndim=1] n_classes, int n_outputs,
+                           bint profile):
     tree = Tree(n_features, n_classes, n_outputs)
 
-    # Get the node_count and resize the tree appropriately
-    cdef SIZE_t node_count = mpi_recv_size(comm, src)
-    tree._resize(node_count)
-    tree.node_count = node_count
-
-    # Get the size of the compressed buffer
-    cdef uLongf compressed_buf_size = mpi_recv_size(comm, src)
+    # Get the header and resize the tree based on the node count
+    cdef MPITreeHeader h = mpi_recv_tree_header(comm, src)
+    tree._resize(h.node_count)
+    tree.node_count = h.node_count
 
     # Get the data buffer
-    cdef np.ndarray compressed_buf = np.empty(compressed_buf_size, dtype=np.dtype('b'))
+    cdef np.ndarray compressed_buf = np.empty(h.compressed_buf_size, dtype=np.dtype('b'))
     comm.Recv(compressed_buf, source=src)
+
+    if profile:
+        t_recv = time.time()
 
     # Unzip the buffer
     cdef uLongf buf_size = mpi_tree_buf_size(tree)
     cdef uLongf expected_buf_size = buf_size
     cdef np.ndarray buf = np.empty(buf_size, dtype=np.dtype('b'))
     cdef int err = uncompress(
-        <Bytef *>buf.data, &buf_size, <const Bytef *>compressed_buf.data, compressed_buf_size)
+        <Bytef *>buf.data, &buf_size, <const Bytef *>compressed_buf.data, h.compressed_buf_size)
     if err != Z_OK:
         raise RuntimeError('zlib error on uncompress: {}'.format(int(err)))
     if buf_size != expected_buf_size:
@@ -1456,4 +1478,8 @@ cpdef Tree mpi_recv_tree(int n_features, np.ndarray[SIZE_t, ndim=1] n_classes, i
 
     memcpy(tree.value, cursor, mpi_tree_value_buf_size(tree))
 
-    return tree
+    if profile:
+        t_end = time.time()
+        return tree, t_recv, t_end
+    else:
+        return tree
