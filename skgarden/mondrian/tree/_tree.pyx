@@ -1330,7 +1330,7 @@ cdef MPITreeHeader mpi_recv_tree_header(object comm, int src):
     comm.Recv(arr, source=src)
     return h
 
-cpdef object mpi_send_tree(object comm, int dst, Tree tree, int compression, bint profile):
+cpdef object mpi_send_tree(object comm, int dst, Tree tree, int compression, bint profile, bint send_to_all):
     if compression < 0 or compression > 9:
         raise ValueError('compression must be in [0, 9] (got {})'.format(int(compression)))
 
@@ -1397,9 +1397,14 @@ cpdef object mpi_send_tree(object comm, int dst, Tree tree, int compression, bin
     if profile:
         sent_bytes = sizeof(h) + compressed_buf_size
         t_sent = time.time()
-
-    mpi_send_tree_header(comm, dst, h)
-    comm.Send(compressed_buf, dst)
+    if send_to_all:
+        for dst in range(comm.size):
+            if dst != comm.rank:
+                mpi_send_tree_header(comm, dst, h)
+                comm.Send(compressed_buf, dst)
+    else:
+        mpi_send_tree_header(comm, dst, h)
+        comm.Send(compressed_buf, dst)
 
     if profile:
         return (t_start, t_sent, sent_bytes)

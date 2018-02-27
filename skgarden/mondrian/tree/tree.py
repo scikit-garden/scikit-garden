@@ -514,8 +514,8 @@ class MondrianTreeRegressor(BaseMondrianTree, RegressorMixin):
 #   profile:     if True, the return value is a tuple
 #                (absolute start time, aboslute time sent, bytes sent). Else, the return value is
 #                None.
-def mpi_send(comm, dst, tree, compression=1, profile=False):
-    return _tree.mpi_send_tree(comm, dst, tree.tree_, compression, profile)
+def mpi_send(comm, dst, tree, compression=1, profile=False, send_to_all=False):
+    return _tree.mpi_send_tree(comm, dst, tree.tree_, compression, profile, send_to_all)
 
 # Receive, decompress, and deserialize a tree sent by the task with rank src in the given MPI
 # communictor. The tree must have been sent via mpi_send_tree(), or else the behavior is undefined.
