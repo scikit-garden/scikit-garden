@@ -4,6 +4,7 @@ from numpy import ma
 from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble.forest import ForestRegressor
+from sklearn.externals.joblib import delayed, Parallel
 from sklearn.utils import check_array
 from sklearn.utils import check_random_state
 from sklearn.utils import check_X_y
@@ -11,6 +12,30 @@ from sklearn.utils import check_X_y
 from .tree import DecisionTreeQuantileRegressor
 from .tree import ExtraTreeQuantileRegressor
 from .utils import weighted_percentile
+
+
+def _bin_after_fit(i, est, y, bootstrap):
+    if bootstrap:
+        bootstrap_indices = generate_sample_indices(
+                est.random_state, len(y))
+    else:
+        bootstrap_indices = np.arange(len(y))
+    
+    est_weights = np.bincount(bootstrap_indices, minlength=len(y))
+    y_train_leaves = est.y_train_leaves
+
+    # TODO: probably can acheive better parallelism by parallelizing 
+    # at the leaf-level, rather than the tree level
+
+    y_weights = np.zeros_like(y_train_leaves, dtype=np.float32)
+    for curr_leaf in np.unique(y_train_leaves):
+        y_ind = y_train_leaves == curr_leaf
+        y_weights[y_ind] = (
+            est_weights[y_ind] / np.sum(est_weights[y_ind])
+        )
+
+    return i, y_weights, y_train_leaves, bootstrap_indices    
+
 
 def generate_sample_indices(random_state, n_samples):
     """
@@ -83,21 +108,14 @@ class BaseForestQuantileRegressor(ForestRegressor):
         self.y_train_leaves_ = -np.ones((self.n_estimators, len(y)), dtype=np.int32)
         self.y_weights_ = np.zeros_like((self.y_train_leaves_), dtype=np.float32)
 
-        for i, est in enumerate(self.estimators_):
-            if self.bootstrap:
-                bootstrap_indices = generate_sample_indices(
-                    est.random_state, len(y))
-            else:
-                bootstrap_indices = np.arange(len(y))
+        estimator_bins = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+            delayed(_bin_after_fit)(i, est, y, self.bootstrap) for i, est in enumerate(self.estimators_)
+        )
 
-            est_weights = np.bincount(bootstrap_indices, minlength=len(y))
-            y_train_leaves = est.y_train_leaves_
-            for curr_leaf in np.unique(y_train_leaves):
-                y_ind = y_train_leaves == curr_leaf
-                self.y_weights_[i, y_ind] = (
-                    est_weights[y_ind] / np.sum(est_weights[y_ind]))
-
+        for i, y_weights, y_train_leaves, bootstrap_indices in estimator_bins:
+            self.y_weights[i, :] = y_weights
             self.y_train_leaves_[i, bootstrap_indices] = y_train_leaves[bootstrap_indices]
+
         return self
 
     def predict(self, X, quantile=None):
