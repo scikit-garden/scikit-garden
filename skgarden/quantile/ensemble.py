@@ -1,9 +1,12 @@
 from __future__ import division
 import numpy as np
+import threading
+
 from numpy import ma
 from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble.forest import ForestRegressor
+from sklearn.externals.joblib import delayed, Parallel
 from sklearn.utils import check_array
 from sklearn.utils import check_random_state
 from sklearn.utils import check_X_y
@@ -11,6 +14,43 @@ from sklearn.utils import check_X_y
 from .tree import DecisionTreeQuantileRegressor
 from .tree import ExtraTreeQuantileRegressor
 from .utils import weighted_percentile
+
+def _bin_after_fit(i, est, y, bootstrap):
+    if bootstrap:
+        bootstrap_indices = generate_sample_indices(
+                est.random_state, len(y))
+    else:
+        bootstrap_indices = np.arange(len(y))
+    
+    est_weights = np.bincount(bootstrap_indices, minlength=len(y))
+    y_train_leaves = est.y_train_leaves_
+
+    # TODO: probably can acheive better parallelism by parallelizing 
+    # at the leaf-level, rather than the tree level
+
+    y_weights = np.zeros_like(y_train_leaves, dtype=np.float32)
+    for curr_leaf in np.unique(y_train_leaves):
+        y_ind = y_train_leaves == curr_leaf
+        y_weights[y_ind] = (
+            est_weights[y_ind] / np.sum(est_weights[y_ind])
+        )
+
+    return i, y_weights, y_train_leaves, bootstrap_indices    
+
+def _weights_single_tree(y_train_leaves_, y_weights_, j, x_tree, weights, lock):
+    """
+    Compute the weights for a single tree
+    :param j: the index of a single tree
+    :param x_tree: a vector of size n_samples, ie number of predictions to be made    
+    """
+    mask = y_train_leaves_[j, :] == np.expand_dims(x_tree, 1)
+    new_weights = (
+        np.tile(y_weights_[j, :], (len(x_tree), 1)) * mask #TODO: Hmm, does this break multi-response regression?
+    )
+    with lock:
+        weights += new_weights
+
+
 
 def generate_sample_indices(random_state, n_samples):
     """
@@ -83,21 +123,14 @@ class BaseForestQuantileRegressor(ForestRegressor):
         self.y_train_leaves_ = -np.ones((self.n_estimators, len(y)), dtype=np.int32)
         self.y_weights_ = np.zeros_like((self.y_train_leaves_), dtype=np.float32)
 
-        for i, est in enumerate(self.estimators_):
-            if self.bootstrap:
-                bootstrap_indices = generate_sample_indices(
-                    est.random_state, len(y))
-            else:
-                bootstrap_indices = np.arange(len(y))
+        estimator_bins = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+            delayed(_bin_after_fit)(i, est, y, self.bootstrap) for i, est in enumerate(self.estimators_)
+        )
 
-            est_weights = np.bincount(bootstrap_indices, minlength=len(y))
-            y_train_leaves = est.y_train_leaves_
-            for curr_leaf in np.unique(y_train_leaves):
-                y_ind = y_train_leaves == curr_leaf
-                self.y_weights_[i, y_ind] = (
-                    est_weights[y_ind] / np.sum(est_weights[y_ind]))
-
+        for i, y_weights, y_train_leaves, bootstrap_indices in estimator_bins:
+            self.y_weights_[i, :] = y_weights
             self.y_train_leaves_[i, bootstrap_indices] = y_train_leaves[bootstrap_indices]
+
         return self
 
     def predict(self, X, quantile=None):
@@ -128,18 +161,28 @@ class BaseForestQuantileRegressor(ForestRegressor):
         X = check_array(X, dtype=np.float32, accept_sparse="csc")
         if quantile is None:
             return super(BaseForestQuantileRegressor, self).predict(X)
-
+        
         sorter = np.argsort(self.y_train_)
-        X_leaves = self.apply(X)
+        X_leaves = self.apply(X) # X_leaves.shape -> (n_samples, n_estimators)
         weights = np.zeros((X.shape[0], len(self.y_train_)))
         quantiles = np.zeros((X.shape[0]))
-        for i, x_leaf in enumerate(X_leaves):
-            mask = self.y_train_leaves_ != np.expand_dims(x_leaf, 1)
-            x_weights = ma.masked_array(self.y_weights_, mask)
-            weights = x_weights.sum(axis=0)
+
+        # NB: Here, we use a lock, as in https://github.com/scikit-learn/scikit-learn/blob/bac89c2/sklearn/ensemble/forest.py#L593,
+        # TODO: Give user the option to go without a lock, at the cost of memory that goes like \theta(n_estimators * n_train * n_samples)
+        lock = threading.Lock() 
+        Parallel(n_jobs=self.n_jobs, verbose=self.verbose, require="sharedmem")(
+            delayed(_weights_single_tree)(self.y_train_leaves_, self.y_weights_, j, x_tree, weights, lock)
+            for j, x_tree in enumerate(X_leaves.T)
+        )        
+        
+        for i in range(X.shape[0]):
             quantiles[i] = weighted_percentile(
-                self.y_train_, quantile, weights, sorter)
+                self.y_train_, quantile, weights[i, :], sorter
+            )
         return quantiles
+
+        
+
 
 
 class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
