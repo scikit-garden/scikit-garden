@@ -3,8 +3,8 @@
 from distutils.version import LooseVersion
 import os
 
-import numpy as np
 from setuptools import Extension, find_packages, setup
+from setuptools.command.build_ext import build_ext
 
 
 DISTNAME = 'scikit-garden'
@@ -15,22 +15,7 @@ MAINTAINER_EMAIL = 'mks542@nyu.edu'
 LICENSE = 'new BSD'
 VERSION = '0.1.3'
 
-CYTHON_MIN_VERSION = '0.23'
 
-
-message = ('Please install cython with a version >= {0} in order '
-           'to build a scikit-garden development version.').format(
-           CYTHON_MIN_VERSION)
-try:
-    import Cython
-    if LooseVersion(Cython.__version__) < CYTHON_MIN_VERSION:
-        message += ' Your version of Cython was {0}.'.format(
-            Cython.__version__)
-        raise ValueError(message)
-    from Cython.Build import cythonize
-except ImportError as exc:
-    exc.args += (message,)
-    raise
 
 libraries = []
 if os.name == 'posix':
@@ -41,15 +26,27 @@ for name in ['_tree', '_splitter', '_criterion', '_utils']:
     extensions.append(Extension(
         'skgarden.mondrian.tree.{}'.format(name),
         sources=['skgarden/mondrian/tree/{}.pyx'.format(name)],
-        include_dirs=[np.get_include()],
         libraries=libraries,
         extra_compile_args=['-O3'],
     ))
-extensions = cythonize(extensions)
+
+class CustomBuildExtCommand(build_ext):
+    """build_ext command for use when numpy headers are needed."""
+    def run(self):
+
+        # Import numpy here, only when headers are needed
+        import numpy
+        # Add numpy headers to include_dirs
+        self.include_dirs.append(numpy.get_include())
+
+        # Call original build_ext command
+        build_ext.run(self)
+
 
 
 if __name__ == "__main__":
     setup(name=DISTNAME,
+          cmdclass={'build_ext': CustomBuildExtCommand},
           maintainer=MAINTAINER,
           maintainer_email=MAINTAINER_EMAIL,
           packages=find_packages(),
@@ -72,6 +69,6 @@ if __name__ == "__main__":
               'Operating System :: Unix',
               'Operating System :: MacOS'
             ],
-          install_requires=["numpy", "scipy", "scikit-learn>=0.18", "cython"],
-          setup_requires=["cython"],
+          install_requires=["cython>=0.23", "numpy", "scipy", "scikit-learn>=0.18"],
+          setup_requires=["cython", "numpy"],
           ext_modules=extensions)
