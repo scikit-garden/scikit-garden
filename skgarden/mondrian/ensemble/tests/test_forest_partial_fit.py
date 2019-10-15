@@ -9,7 +9,7 @@ from sklearn.utils.testing import assert_greater
 from skgarden import MondrianForestRegressor
 from skgarden import MondrianForestClassifier
 
-
+# This is a valid test case.
 def check_partial_fit_equivalence(size_batch, f, random_state, X, y, is_clf=False):
     start_ptr = list(range(0, 100, size_batch))
     end_ptr = start_ptr[1:] + [100]
