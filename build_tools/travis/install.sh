@@ -30,6 +30,6 @@ source activate testenv
 pip install git+http://github.com/scikit-learn/scikit-learn.git
 
 python --version
+pip install -e .
 python -c "import numpy; print('numpy %s' % numpy.__version__)"
 python -c "import scipy; print('scipy %s' % scipy.__version__)"
-python setup.py develop
