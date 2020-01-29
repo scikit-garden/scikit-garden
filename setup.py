@@ -72,7 +72,7 @@ if __name__ == "__main__":
               'Operating System :: Unix',
               'Operating System :: MacOS'
             ],
-          install_requires=["numpy", "scipy", "scikit-learn>=0.18"],
+          install_requires=["numpy", "scipy", "scikit-learn>=0.18", "six"],
           setup_requires=["Cython>=0.23", "numpy", "setuptools>=18"],
           ext_modules=extensions,
           )
