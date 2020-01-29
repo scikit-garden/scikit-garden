@@ -20,10 +20,8 @@ from sklearn.utils.testing import assert_array_equal
 from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.utils.testing import assert_almost_equal
 from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_false
 from sklearn.utils.testing import assert_greater
 from sklearn.utils.testing import assert_less
-from sklearn.utils.testing import assert_true
 
 from skgarden.mondrian import MondrianTreeClassifier
 from skgarden.mondrian import MondrianTreeRegressor
@@ -365,8 +363,8 @@ def test_std_positive():
          [2.97979798],
          [3.08080808]])
     _, y_std = mr.predict(X_test, return_std=True)
-    assert_false(np.any(np.isnan(y_std)))
-    assert_false(np.any(np.isinf(y_std)))
+    assert not np.any(np.isnan(y_std))
+    assert not np.any(np.isinf(y_std))
 
 
 def check_mean_std_reg_convergence(est, X_train, y_train):
@@ -474,14 +472,14 @@ def test_apply():
         est_clone.fit(X_train, y_train)
         train_leaves = est_clone.tree_.children_left[est_clone.apply(X_train)]
         test_leaves = est_clone.tree_.children_left[est_clone.apply(X_test)]
-        assert_true(np.all(train_leaves == -1))
-        assert_true(np.all(test_leaves == -1))
+        assert np.all(train_leaves == -1)
+        assert np.all(test_leaves == -1)
 
         est_clone.partial_fit(X_train, y_train)
         train_leaves = est_clone.tree_.children_left[est_clone.apply(X_train)]
         test_leaves = est_clone.tree_.children_left[est_clone.apply(X_test)]
-        assert_true(np.all(train_leaves == -1))
-        assert_true(np.all(test_leaves == -1))
+        assert np.all(train_leaves == -1)
+        assert np.all(test_leaves == -1)
 
 def check_pickle(est, X, y):
     score1 = est.score(X, y)
@@ -522,4 +520,4 @@ def test_tree_identical_labels():
         y = np.array([0.0]*50 + [1.0]*50)
         c_est.fit(X, y)
         leaf_ids = c_est.tree_.children_left == -1
-        assert_true(np.any(c_est.tree_.n_node_samples[leaf_ids] > 2))
+        assert np.any(c_est.tree_.n_node_samples[leaf_ids] > 2)
