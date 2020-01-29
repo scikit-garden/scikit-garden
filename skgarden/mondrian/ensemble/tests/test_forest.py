@@ -12,8 +12,6 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.utils.testing import assert_array_equal
 from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_false
-from sklearn.utils.testing import assert_true
 from sklearn.utils.testing import assert_greater
 
 from skgarden import MondrianForestClassifier
@@ -49,22 +47,22 @@ def test_boston():
 def test_forest_attributes():
     mr = MondrianForestRegressor(n_estimators=5, random_state=0)
     mr.fit([[1, 2, 3], [4, 5, 6]], [1, 2])
-    assert_false(hasattr(mr, "classes_"))
-    assert_false(hasattr(mr, "n_classes_"))
+    assert not hasattr(mr, "classes_")
+    assert not hasattr(mr, "n_classes_")
 
     mr.partial_fit([[1, 2, 3], [4, 5, 6]], [1, 2])
-    assert_false(hasattr(mr, "classes_"))
-    assert_false(hasattr(mr, "n_classes_"))
+    assert not hasattr(mr, "classes_")
+    assert not hasattr(mr, "n_classes_")
 
     mr = MondrianForestClassifier(n_estimators=5, random_state=0)
     mr.fit([[1, 2, 3], [4, 5, 6]], [1, 2])
-    assert_true(hasattr(mr, "classes_"))
-    assert_true(hasattr(mr, "n_classes_"))
+    assert hasattr(mr, "classes_")
+    assert hasattr(mr, "n_classes_")
 
     mr = MondrianForestClassifier(n_estimators=5, random_state=0)
     mr.partial_fit([[1, 2, 3], [4, 5, 6]], [1, 2])
-    assert_true(hasattr(mr, "classes_"))
-    assert_true(hasattr(mr, "n_classes_"))
+    assert hasattr(mr, "classes_")
+    assert hasattr(mr, "n_classes_")
 
 
 def check_pickle(est):
@@ -108,7 +106,7 @@ def test_min_samples_split():
         for est in ensemble.estimators_:
             n_samples = est.tree_.n_node_samples
             leaves = est.tree_.children_left == -1
-            assert_true(np.all(n_samples[~leaves] >= min_samples_split))
+            assert np.all(n_samples[~leaves] >= min_samples_split)
 
 
 def test_memory_layout():
@@ -153,7 +151,7 @@ def check_decision_path(ensemble):
     leaf_indices = ensemble.apply(X) + np.reshape(col_inds[:-1], (1, -1))
     for sample_ind, curr_leaf in enumerate(leaf_indices):
         sample_indices = indices[indptr[sample_ind]: indptr[sample_ind + 1]]
-        assert_true(np.all(np.in1d(curr_leaf, sample_indices)))
+        assert np.all(np.in1d(curr_leaf, sample_indices))
 
 
 def test_decision_path():
@@ -276,4 +274,4 @@ def test_tree_identical_labels():
         ensemble.fit(X, y)
         for est in ensemble.estimators_:
             leaf_ids = est.tree_.children_left == -1
-            assert_true(np.any(est.tree_.n_node_samples[leaf_ids] > 2))
+            assert p.any(est.tree_.n_node_samples[leaf_ids] > 2)
