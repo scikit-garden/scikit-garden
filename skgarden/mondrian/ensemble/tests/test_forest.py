@@ -274,4 +274,4 @@ def test_tree_identical_labels():
         ensemble.fit(X, y)
         for est in ensemble.estimators_:
             leaf_ids = est.tree_.children_left == -1
-            assert p.any(est.tree_.n_node_samples[leaf_ids] > 2)
+            assert np.any(est.tree_.n_node_samples[leaf_ids] > 2)
