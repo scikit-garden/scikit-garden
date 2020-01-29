@@ -4,7 +4,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils import check_random_state
 from sklearn.utils.testing import assert_array_equal
 from sklearn.utils.testing import assert_array_almost_equal
-from sklearn.utils.testing import assert_true
 
 from skgarden.quantile import RandomForestQuantileRegressor
 from skgarden.quantile import ExtraTreesQuantileRegressor
@@ -46,7 +45,7 @@ def test_quantile_attributes():
             np.sum(est.y_weights_, axis=1),
             [sum(tree.tree_.children_left == -1) for tree in est.estimators_]
         )
-        assert_true(np.all(est.y_train_leaves_ != -1))
+        assert np.all(est.y_train_leaves_ != -1)
 
 
 def test_tree_forest_equivalence():
@@ -61,7 +60,7 @@ def test_tree_forest_equivalence():
     dtqr = DecisionTreeQuantileRegressor(random_state=0, max_depth=2)
     dtqr.fit(X_train, y_train)
 
-    assert_true(np.all(rfqr.y_train_leaves_ == dtqr.y_train_leaves_))
+    assert np.all(rfqr.y_train_leaves_ == dtqr.y_train_leaves_)
     assert_array_almost_equal(
         rfqr.predict(X_test, quantile=10),
         dtqr.predict(X_test, quantile=10), 5)
@@ -95,12 +94,12 @@ def test_base_forest_quantile():
     rfqr = RandomForestQuantileRegressor(random_state=0, max_depth=1)
     rfqr.fit(X, y)
     for est in rfqr.estimators_:
-        assert_true(isinstance(est, DecisionTreeQuantileRegressor))
+        assert isinstance(est, DecisionTreeQuantileRegressor)
 
     etqr = ExtraTreesQuantileRegressor(random_state=0, max_depth=1)
     etqr.fit(X, y)
     for est in etqr.estimators_:
-        assert_true(isinstance(est, ExtraTreeQuantileRegressor))
+        assert isinstance(est, ExtraTreeQuantileRegressor)
 
 
 def test_forest_toy_data():
