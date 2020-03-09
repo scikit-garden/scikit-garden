@@ -139,7 +139,6 @@ class BaseForestQuantileRegressor(ForestRegressor):
         if len(quantile) == 1:
             sorter = np.argsort(self.y_train_)
             X_leaves = self.apply(X)
-            weights = np.zeros((X.shape[0], len(self.y_train_)))
             quantiles = np.zeros((X.shape[0]))
             for i, x_leaf in enumerate(X_leaves):
                 mask = self.y_train_leaves_ != np.expand_dims(x_leaf, 1)
@@ -155,7 +154,6 @@ class BaseForestQuantileRegressor(ForestRegressor):
 
 
 def predict_quantiles(quantile, X_leaves, y_train_, y_train_leaves_, y_weights_, sorter, x_len=1):
-    weights = np.zeros((x_len, len(y_train_)))
     quantiles = np.zeros((x_len))
     for i, x_leaf in enumerate(X_leaves):
         mask = y_train_leaves_ != np.expand_dims(x_leaf, 1)
