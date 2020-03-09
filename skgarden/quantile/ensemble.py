@@ -12,6 +12,9 @@ from .tree import DecisionTreeQuantileRegressor
 from .tree import ExtraTreeQuantileRegressor
 from .utils import weighted_percentile
 
+import sharedmem
+import multiprocessing as mp
+
 def generate_sample_indices(random_state, n_samples):
     """
     Generates bootstrap indices for each tree fit.
@@ -128,19 +131,51 @@ class BaseForestQuantileRegressor(ForestRegressor):
         X = check_array(X, dtype=np.float32, accept_sparse="csc")
         if quantile is None:
             return super(BaseForestQuantileRegressor, self).predict(X)
+            sorter = np.argsort(self.y_train_)
+            X_leaves = self.apply(X)
 
-        sorter = np.argsort(self.y_train_)
-        X_leaves = self.apply(X)
-        weights = np.zeros((X.shape[0], len(self.y_train_)))
-        quantiles = np.zeros((X.shape[0]))
-        for i, x_leaf in enumerate(X_leaves):
-            mask = self.y_train_leaves_ != np.expand_dims(x_leaf, 1)
-            x_weights = ma.masked_array(self.y_weights_, mask)
-            weights = x_weights.sum(axis=0)
-            quantiles[i] = weighted_percentile(
-                self.y_train_, quantile, weights, sorter)
+        quantile = np.atleast_1d(quantile)
+
+        if len(quantile) == 1:
+            sorter = np.argsort(self.y_train_)
+            X_leaves = self.apply(X)
+            weights = np.zeros((X.shape[0], len(self.y_train_)))
+            quantiles = np.zeros((X.shape[0]))
+            for i, x_leaf in enumerate(X_leaves):
+                mask = self.y_train_leaves_ != np.expand_dims(x_leaf, 1)
+                x_weights = ma.masked_array(self.y_weights_, mask)
+                weights = x_weights.sum(axis=0)
+                quantiles[i] = weighted_percentile(
+                    self.y_train_, quantile, weights, sorter)
+        else:
+            quantiles = np.hstack(mapper(predict_quantiles, quantile, X_leaves, self.y_train_, self.y_train_leaves_,
+                                         self.y_weights_, sorter, x_len=X.shape[0]))
+
         return quantiles
 
+
+def predict_quantiles(quantile, X_leaves, y_train_, y_train_leaves_, y_weights_, sorter, x_len=1):
+    weights = np.zeros((x_len, len(y_train_)))
+    quantiles = np.zeros((x_len))
+    for i, x_leaf in enumerate(X_leaves):
+        mask = y_train_leaves_ != np.expand_dims(x_leaf, 1)
+        x_weights = ma.masked_array(y_weights_, mask)
+        weights = x_weights.sum(axis=0)
+        quantiles[i] = weighted_percentile(
+            y_train_, quantile, weights, sorter)
+    return quantiles.reshape(-1, 1)
+
+
+def mapper(f, pars, *argv, **kwarg):
+    # create a shared object from X
+    x_s = [sharedmem.copy(x) for x in argv]
+    # parallel process over shared object
+    with mp.Pool(mp.cpu_count()) as pool:
+        res = pool.starmap_async(f, [(p, *x_s, *list(kwarg.values())) for p in pars])
+        a = res.get()
+    pool.close()
+    pool.join()
+    return a
 
 class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
     """
