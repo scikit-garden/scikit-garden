@@ -3,10 +3,11 @@ import numpy as np
 from numpy import ma
 from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.ensemble.forest import ForestRegressor
 from sklearn.utils import check_array
 from sklearn.utils import check_random_state
 from sklearn.utils import check_X_y
+
+from ..forest import ForestRegressor
 
 from .tree import DecisionTreeQuantileRegressor
 from .tree import ExtraTreeQuantileRegressor

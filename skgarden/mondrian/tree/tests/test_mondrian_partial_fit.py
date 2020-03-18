@@ -6,11 +6,10 @@ import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.datasets import make_regression
 from sklearn.datasets import load_digits
-from sklearn.utils.testing import assert_almost_equal
-from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_array_almost_equal
-from sklearn.utils.testing import assert_array_equal
-from sklearn.utils.testing import assert_greater
+from numpy.testing import assert_almost_equal
+from numpy.testing import assert_equal
+from numpy.testing import assert_array_almost_equal
+from numpy.testing import assert_array_equal
 
 from skgarden import MondrianTreeClassifier
 from skgarden import MondrianTreeRegressor
@@ -46,8 +45,8 @@ def check_partial_fit_two_samples(tree, X):
     s_f = tree.feature[-1]
     s_t = tree.threshold[-1]
     sort_thresh = np.sort([X[0, s_f], X[1, s_f]])
-    assert_greater(s_t, sort_thresh[0])
-    assert_greater(sort_thresh[1], s_t)
+    assert s_t > sort_thresh[0]
+    assert sort_thresh[1] > s_t
     if X[0, s_f] < s_t:
         assert_array_equal(tree.children_left, [-1, -1, 0])
         assert_array_equal(tree.children_right, [-1, -1, 1])
@@ -300,10 +299,10 @@ def test_min_samples_split():
         mtr.partial_fit(X_r[: X_r.shape[0] // 2], y_r[: X_r.shape[0] // 2])
         mtr.partial_fit(X_r[X_r.shape[0] // 2:], y_r[X_r.shape[0] // 2:])
         n_node_samples = mtr.tree_.n_node_samples[mtr.tree_.children_left != -1]
-        assert_greater(np.min(n_node_samples) + 1, mss)
+        assert np.min(n_node_samples) + 1 > mss
 
         mtc = MondrianTreeClassifier(random_state=0, min_samples_split=mss)
         mtc.partial_fit(X_c[: X_c.shape[0] // 2], y_c[: X_c.shape[0] // 2])
         mtc.partial_fit(X_c[X_c.shape[0] // 2:], y_c[X_c.shape[0] // 2:])
         n_node_samples = mtc.tree_.n_node_samples[mtc.tree_.children_left != -1]
-        assert_greater(np.min(n_node_samples) + 1, mss)
+        assert np.min(n_node_samples) + 1 > mss
