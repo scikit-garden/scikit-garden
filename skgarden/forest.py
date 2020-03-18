@@ -37,6 +37,9 @@ import threading
 from warnings import warn
 
 
+MAX_INT = np.iinfo(np.int32).max
+
+
 def _return_std(X, trees, predictions, min_variance):
     """
     Returns `std(Y | X)`.
@@ -457,7 +460,7 @@ class ExtraTreesRegressor(_sk_ExtraTreesRegressor):
 class BaseForest(MultiOutputMixin, BaseEnsemble, metaclass=ABCMeta):
     """
     Base class for forests of trees.
-    Note: Copied from sklearn source code on 2020-03-18.
+    Note: This is the copied source code from sklearn v0.22
     """
 
     @abstractmethod
@@ -492,13 +495,13 @@ class BaseForest(MultiOutputMixin, BaseEnsemble, metaclass=ABCMeta):
         Apply trees in the forest to X, return leaf indices.
         Parameters
         ----------
-        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+        X : {array-like or sparse matrix} of shape (n_samples, n_features)
             The input samples. Internally, its dtype will be converted to
             ``dtype=np.float32``. If a sparse matrix is provided, it will be
             converted into a sparse ``csr_matrix``.
         Returns
         -------
-        X_leaves : ndarray of shape (n_samples, n_estimators)
+        X_leaves : array_like, shape = [n_samples, n_estimators]
             For each datapoint x in X and for each tree in the forest,
             return the index of the leaf x ends up in.
         """
@@ -516,17 +519,16 @@ class BaseForest(MultiOutputMixin, BaseEnsemble, metaclass=ABCMeta):
         .. versionadded:: 0.18
         Parameters
         ----------
-        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+        X : {array-like or sparse matrix} of shape (n_samples, n_features)
             The input samples. Internally, its dtype will be converted to
             ``dtype=np.float32``. If a sparse matrix is provided, it will be
             converted into a sparse ``csr_matrix``.
         Returns
         -------
-        indicator : sparse matrix of shape (n_samples, n_nodes)
-            Return a node indicator matrix where non zero elements indicates
-            that the samples goes through the nodes. The matrix is of CSR
-            format.
-        n_nodes_ptr : ndarray of shape (n_estimators + 1,)
+        indicator : sparse csr array, shape = [n_samples, n_nodes]
+            Return a node indicator matrix where non zero elements
+            indicates that the samples goes through the nodes.
+        n_nodes_ptr : array of size (n_estimators + 1, )
             The columns from indicator[n_nodes_ptr[i]:n_nodes_ptr[i+1]]
             gives the indicator value for the i-th estimator.
         """
@@ -547,7 +549,7 @@ class BaseForest(MultiOutputMixin, BaseEnsemble, metaclass=ABCMeta):
         Build a forest of trees from the training set (X, y).
         Parameters
         ----------
-        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+        X : array-like or sparse matrix of shape (n_samples, n_features)
             The training input samples. Internally, its dtype will be converted
             to ``dtype=np.float32``. If a sparse matrix is provided, it will be
             converted into a sparse ``csc_matrix``.
@@ -565,15 +567,10 @@ class BaseForest(MultiOutputMixin, BaseEnsemble, metaclass=ABCMeta):
         self : object
         """
         # Validate or convert input data
-        if issparse(y):
-            raise ValueError(
-                "sparse multilabel-indicator for y is not supported."
-            )
-        X, y = self._validate_data(X, y, multi_output=True,
-                                   accept_sparse="csc", dtype=DTYPE)
+        X = check_array(X, accept_sparse="csc", dtype=DTYPE)
+        y = check_array(y, accept_sparse='csc', ensure_2d=False, dtype=None)
         if sample_weight is not None:
             sample_weight = _check_sample_weight(sample_weight, X)
-
         if issparse(X):
             # Pre-sort indices to avoid that each individual tree of the
             # ensemble sorts the indices.
@@ -692,17 +689,11 @@ class BaseForest(MultiOutputMixin, BaseEnsemble, metaclass=ABCMeta):
     @property
     def feature_importances_(self):
         """
-        The impurity-based feature importances.
-        The higher, the more important the feature.
-        The importance of a feature is computed as the (normalized)
-        total reduction of the criterion brought by that feature.  It is also
-        known as the Gini importance.
-        Warning: impurity-based feature importances can be misleading for
-        high cardinality features (many unique values). See
-        :func:`sklearn.inspection.permutation_importance` as an alternative.
+        Return the feature importances (the higher, the more important the
+           feature).
         Returns
         -------
-        feature_importances_ : ndarray of shape (n_features,)
+        feature_importances_ : array, shape = [n_features]
             The values of this array sum to 1, unless all trees are single node
             trees consisting of only the root node, in which case it will be an
             array of zeros.
@@ -739,7 +730,7 @@ def _accumulate_prediction(predict, X, out, lock):
 class ForestClassifier(ClassifierMixin, BaseForest, metaclass=ABCMeta):
     """
     Base class for forest of trees-based classifiers.
-    Note: Copied from sklearn source code on 2020-03-18.
+    Note: This is the copied source code from sklearn v0.22
     """
 
     @abstractmethod
@@ -876,13 +867,13 @@ class ForestClassifier(ClassifierMixin, BaseForest, metaclass=ABCMeta):
         estimate across the trees.
         Parameters
         ----------
-        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+        X : array-like or sparse matrix of shape (n_samples, n_features)
             The input samples. Internally, its dtype will be converted to
             ``dtype=np.float32``. If a sparse matrix is provided, it will be
             converted into a sparse ``csr_matrix``.
         Returns
         -------
-        y : ndarray of shape (n_samples,) or (n_samples, n_outputs)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             The predicted classes.
         """
         proba = self.predict_proba(X)
@@ -913,13 +904,13 @@ class ForestClassifier(ClassifierMixin, BaseForest, metaclass=ABCMeta):
         the same class in a leaf.
         Parameters
         ----------
-        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+        X : array-like or sparse matrix of shape (n_samples, n_features)
             The input samples. Internally, its dtype will be converted to
             ``dtype=np.float32``. If a sparse matrix is provided, it will be
             converted into a sparse ``csr_matrix``.
         Returns
         -------
-        p : ndarray of shape (n_samples, n_classes), or a list of n_outputs
+        p : array of shape (n_samples, n_classes), or a list of n_outputs
             such arrays if n_outputs > 1.
             The class probabilities of the input samples. The order of the
             classes corresponds to that in the attribute :term:`classes_`.
@@ -957,13 +948,13 @@ class ForestClassifier(ClassifierMixin, BaseForest, metaclass=ABCMeta):
         forest.
         Parameters
         ----------
-        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+        X : array-like or sparse matrix of shape (n_samples, n_features)
             The input samples. Internally, its dtype will be converted to
             ``dtype=np.float32``. If a sparse matrix is provided, it will be
             converted into a sparse ``csr_matrix``.
         Returns
         -------
-        p : ndarray of shape (n_samples, n_classes), or a list of n_outputs
+        p : array of shape (n_samples, n_classes), or a list of n_outputs
             such arrays if n_outputs > 1.
             The class probabilities of the input samples. The order of the
             classes corresponds to that in the attribute :term:`classes_`.
@@ -979,11 +970,10 @@ class ForestClassifier(ClassifierMixin, BaseForest, metaclass=ABCMeta):
 
             return proba
 
-
 class ForestRegressor(RegressorMixin, BaseForest, metaclass=ABCMeta):
     """
     Base class for forest of trees-based regressors.
-    Note: Copied from sklearn source code on 2020-03-18.
+    Note: This is the copied source code from sklearn v0.22
     """
 
     @abstractmethod
@@ -1017,13 +1007,13 @@ class ForestRegressor(RegressorMixin, BaseForest, metaclass=ABCMeta):
         mean predicted regression targets of the trees in the forest.
         Parameters
         ----------
-        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+        X : array-like or sparse matrix of shape (n_samples, n_features)
             The input samples. Internally, its dtype will be converted to
             ``dtype=np.float32``. If a sparse matrix is provided, it will be
             converted into a sparse ``csr_matrix``.
         Returns
         -------
-        y : ndarray of shape (n_samples,) or (n_samples, n_outputs)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             The predicted values.
         """
         check_is_fitted(self)
@@ -1096,32 +1086,3 @@ class ForestRegressor(RegressorMixin, BaseForest, metaclass=ABCMeta):
                                         predictions[:, k])
 
         self.oob_score_ /= self.n_outputs_
-
-    def _compute_partial_dependence_recursion(self, grid, target_features):
-        """Fast partial dependence computation.
-        Parameters
-        ----------
-        grid : ndarray of shape (n_samples, n_target_features)
-            The grid points on which the partial dependence should be
-            evaluated.
-        target_features : ndarray of shape (n_target_features)
-            The set of target features for which the partial dependence
-            should be evaluated.
-        Returns
-        -------
-        averaged_predictions : ndarray of shape (n_samples,)
-            The value of the partial dependence function on each grid point.
-        """
-        grid = np.asarray(grid, dtype=DTYPE, order='C')
-        averaged_predictions = np.zeros(shape=grid.shape[0],
-                                        dtype=np.float64, order='C')
-
-        for tree in self.estimators_:
-            # Note: we don't sum in parallel because the GIL isn't released in
-            # the fast method.
-            tree.tree_.compute_partial_dependence(
-                grid, target_features, averaged_predictions)
-        # Average over the forest
-        averaged_predictions /= len(self.estimators_)
-
-        return averaged_predictions
