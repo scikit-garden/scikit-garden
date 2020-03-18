@@ -3,13 +3,39 @@ import numpy as np
 from sklearn.ensemble import RandomForestRegressor as _sk_RandomForestRegressor
 from sklearn.ensemble import ExtraTreesRegressor as _sk_ExtraTreesRegressor
 from sklearn.ensemble import BaseEnsemble
+from sklearn.ensemble._base import _partition_estimators
+
+from sklearn.tree._tree import DTYPE, DOUBLE
 
 from sklearn.base import ClassifierMixin
 from sklearn.base import RegressorMixin
 from sklearn.base import MultiOutputMixin
 
+from sklearn.metrics import r2_score
+
+from sklearn.utils import check_random_state
+from sklearn.utils import check_array
+from sklearn.utils import compute_sample_weight
+from sklearn.utils.fixes import _joblib_parallel_args
+from sklearn.utils.multiclass import check_classification_targets
+from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import _check_sample_weight
+
+from sklearn.exceptions import DataConversionWarning
+
 from abc import ABCMeta
 from abc import abstractmethod
+
+from scipy.sparse import issparse
+from scipy.sparse import hstack as sparse_hstack
+
+from joblib import Parallel
+from joblib import delayed
+
+import threading
+
+from warnings import warn
+
 
 def _return_std(X, trees, predictions, min_variance):
     """
