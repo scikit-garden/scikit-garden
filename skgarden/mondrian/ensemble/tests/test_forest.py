@@ -86,11 +86,11 @@ def test_parallel_train():
     for curr_est in ensembles:
         est = clone(curr_est)
         y_pred = ([est.set_params(n_jobs=n_jobs).fit(X, y).predict(X)
-                   for n_jobs in [1, 2, 4, 8]])
+                   for n_jobs in [1, 2]])
         for pred1, pred2 in zip(y_pred, y_pred[1:]):
             assert_array_equal(pred1, pred2)
         y_pred = ([est.set_params(n_jobs=n_jobs).partial_fit(X, y).predict(X)
-                   for n_jobs in [1, 2, 4, 8]])
+                   for n_jobs in [1, 2]])
         for pred1, pred2 in zip(y_pred, y_pred[1:]):
             assert_array_equal(pred1, pred2)
 
