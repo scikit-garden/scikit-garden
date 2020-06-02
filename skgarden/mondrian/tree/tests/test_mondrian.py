@@ -16,14 +16,13 @@ from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.utils.testing import assert_array_equal
-from sklearn.utils.testing import assert_array_almost_equal
-from sklearn.utils.testing import assert_almost_equal
-from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_false
-from sklearn.utils.testing import assert_greater
-from sklearn.utils.testing import assert_less
-from sklearn.utils.testing import assert_true
+from skgarden.utils.testing import assert_array_equal
+from skgarden.utils.testing import assert_array_almost_equal
+from skgarden.utils.testing import assert_almost_equal
+from skgarden.utils.testing import assert_equal
+from skgarden.utils.testing import assert_false
+from skgarden.utils.testing import assert_less
+from skgarden.utils.testing import assert_true
 
 from skgarden.mondrian import MondrianTreeClassifier
 from skgarden.mondrian import MondrianTreeRegressor
@@ -354,7 +353,7 @@ def test_weighted_decision_path_classif():
 
 def test_std_positive():
     """Sometimes variance can be slightly negative due to numerical errors."""
-    X = np.linspace(-np.pi, np.pi, 20.0)
+    X = np.linspace(-np.pi, np.pi, 20)
     y = 2*np.sin(X)
     X_train = np.reshape(X, (-1, 1))
     mr = MondrianTreeRegressor(random_state=0)

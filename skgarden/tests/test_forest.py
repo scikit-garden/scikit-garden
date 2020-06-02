@@ -2,8 +2,8 @@ import numpy as np
 from functools import partial
 
 from sklearn.utils import check_random_state
-from sklearn.utils.testing import assert_array_equal
-from sklearn.utils.testing import assert_array_almost_equal
+from skgarden.utils.testing import assert_array_equal
+from skgarden.utils.testing import assert_array_almost_equal
 
 from skgarden import RandomForestRegressor
 from skgarden import ExtraTreesRegressor

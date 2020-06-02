@@ -7,10 +7,10 @@ from sklearn.datasets import make_classification
 from sklearn.datasets import make_regression
 from sklearn.datasets import load_digits
 from sklearn.utils.testing import assert_almost_equal
-from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_array_almost_equal
-from sklearn.utils.testing import assert_array_equal
-from sklearn.utils.testing import assert_greater
+from skgarden.utils.testing import assert_equal
+from skgarden.utils.testing import assert_array_almost_equal
+from skgarden.utils.testing import assert_array_equal
+from skgarden.utils.testing import assert_greater
 
 from skgarden import MondrianTreeClassifier
 from skgarden import MondrianTreeRegressor

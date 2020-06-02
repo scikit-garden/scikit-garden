@@ -2,9 +2,9 @@ import numpy as np
 from sklearn.datasets import load_digits
 from sklearn.datasets import make_classification
 from sklearn.datasets import make_regression
-from sklearn.utils.testing import assert_array_equal
-from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_greater
+from skgarden.utils.testing import assert_array_equal
+from skgarden.utils.testing import assert_equal
+from skgarden.utils.testing import assert_greater
 
 from skgarden import MondrianForestRegressor
 from skgarden import MondrianForestClassifier

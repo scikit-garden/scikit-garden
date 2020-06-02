@@ -72,6 +72,6 @@ if __name__ == "__main__":
               'Operating System :: Unix',
               'Operating System :: MacOS'
             ],
-          install_requires=["numpy", "scipy", "scikit-learn>=0.18", "cython"],
+          install_requires=["numpy", "scipy", "scikit-learn>=0.18", "cython", "joblib", "six"],
           setup_requires=["cython"],
           ext_modules=extensions)

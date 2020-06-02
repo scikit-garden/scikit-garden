@@ -2,9 +2,9 @@ import numpy as np
 from sklearn.datasets import load_boston
 from sklearn.model_selection import train_test_split
 from sklearn.utils import check_random_state
-from sklearn.utils.testing import assert_array_equal
-from sklearn.utils.testing import assert_array_almost_equal
-from sklearn.utils.testing import assert_true
+from skgarden.utils.testing import assert_array_equal
+from skgarden.utils.testing import assert_array_almost_equal
+from skgarden.utils.testing import assert_true
 
 from skgarden.quantile import RandomForestQuantileRegressor
 from skgarden.quantile import ExtraTreesQuantileRegressor
@@ -72,7 +72,7 @@ def test_max_depth_None_rfqr():
     # the mean equals any quantile.
     rng = np.random.RandomState(0)
     X = rng.randn(10, 1)
-    y = np.linspace(0.0, 100.0, 10.0)
+    y = np.linspace(0.0, 100.0, 10)
 
     rfqr = RandomForestQuantileRegressor(
         random_state=0, bootstrap=False, max_depth=None)
@@ -90,7 +90,7 @@ def test_base_forest_quantile():
     """
     rng = np.random.RandomState(0)
     X = rng.randn(10, 1)
-    y = np.linspace(0.0, 100.0, 10.0)
+    y = np.linspace(0.0, 100.0, 10)
 
     rfqr = RandomForestQuantileRegressor(random_state=0, max_depth=1)
     rfqr.fit(X, y)
