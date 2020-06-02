@@ -3,8 +3,8 @@ from scipy import sparse
 from sklearn.base import ClassifierMixin
 from sklearn.ensemble.forest import ForestClassifier
 from sklearn.ensemble.forest import ForestRegressor
-from sklearn.exceptions import NotFittedError
-from sklearn.externals.joblib import delayed, Parallel
+from sklearn.exceptions import NotFittedError, DataConversionWarning
+from joblib import delayed, Parallel
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_array
@@ -116,10 +116,10 @@ class BaseMondrian(object):
 
         # XXX: Switch to threading backend when GIL is released.
         if isinstance(self, ClassifierMixin):
-            self.estimators_ = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+            self.estimators_ = Parallel(n_jobs=self.n_jobs, backend="multiprocessing", verbose=self.verbose)(
                 delayed(_single_tree_pfit)(t, X, y, classes) for t in self.estimators_)
         else:
-            self.estimators_ = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+            self.estimators_ = Parallel(n_jobs=self.n_jobs, backend="multiprocessing", verbose=self.verbose)(
                 delayed(_single_tree_pfit)(t, X, y) for t in self.estimators_)
 
         return self

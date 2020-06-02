@@ -28,7 +28,7 @@ from scipy.sparse import issparse
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
 from sklearn.base import RegressorMixin
-from sklearn.externals import six
+import six
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
 from sklearn.utils import compute_sample_weight

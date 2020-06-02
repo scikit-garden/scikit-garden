@@ -9,12 +9,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.utils.testing import assert_array_equal
-from sklearn.utils.testing import assert_array_almost_equal
-from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_false
-from sklearn.utils.testing import assert_true
-from sklearn.utils.testing import assert_greater
+from skgarden.utils.testing import assert_array_equal
+from skgarden.utils.testing import assert_array_almost_equal
+from skgarden.utils.testing import assert_equal
+from skgarden.utils.testing import assert_false
+from skgarden.utils.testing import assert_true
+from skgarden.utils.testing import assert_greater
 
 from skgarden import MondrianForestClassifier
 from skgarden import MondrianForestRegressor

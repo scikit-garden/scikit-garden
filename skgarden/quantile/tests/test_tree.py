@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.datasets import load_boston
 from sklearn.model_selection import train_test_split
-from sklearn.utils.testing import assert_array_almost_equal
+from skgarden.utils.testing import assert_array_almost_equal
 
 from skgarden.quantile import DecisionTreeQuantileRegressor
 from skgarden.quantile import ExtraTreeQuantileRegressor
