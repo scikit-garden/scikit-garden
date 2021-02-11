@@ -8,8 +8,6 @@ from sklearn.utils import check_array, check_X_y
 from ..forest import ForestRegressor
 from .utils import _quantile_forest_predict, _weighted_random_sample, generate_sample_indices, set_tdigest, \
     tdigestlist_quantile
-import dask.dataframe as dd
-import dask.array as da
 
 
 class _DefaultForestQuantileRegressor(ForestRegressor):

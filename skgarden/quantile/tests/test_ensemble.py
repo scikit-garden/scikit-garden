@@ -1,14 +1,12 @@
 import numpy as np
+from numpy.testing import assert_array_almost_equal
+from numpy.testing import assert_array_equal
 from sklearn.datasets import load_boston
 from sklearn.model_selection import train_test_split
-from sklearn.utils import check_random_state
-from numpy.testing import assert_array_equal
-from numpy.testing import assert_array_almost_equal
 
-from skgarden.quantile import RandomForestQuantileRegressor
-from skgarden.quantile import ExtraTreesQuantileRegressor
 from skgarden.quantile import DecisionTreeQuantileRegressor
-from skgarden.quantile import ExtraTreeQuantileRegressor
+from skgarden.quantile import ExtraTreesQuantileRegressor
+from skgarden.quantile import RandomForestQuantileRegressor
 
 boston = load_boston()
 X, y = boston.data, boston.target
