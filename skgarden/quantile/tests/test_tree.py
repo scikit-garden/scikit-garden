@@ -5,7 +5,7 @@ from numpy.testing import assert_array_almost_equal
 
 from skgarden.quantile import DecisionTreeQuantileRegressor
 from skgarden.quantile import ExtraTreeQuantileRegressor
-from skgarden.quantile.utils import weighted_percentile
+from skgarden.quantile.utils import weighted_quantile
 
 boston = load_boston()
 X, y = boston.data, boston.target
@@ -26,13 +26,12 @@ def test_quantiles():
         est.fit(X_train, y_train)
         tree = est.tree_
 
-        for q in [20, 40, 50, 60, 80, 90]:
+        for q in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
             left_ind = X_train[:, tree.feature[0]] <= tree.threshold[0]
             right_ind = X_train[:, tree.feature[0]] > tree.threshold[0]
 
-            # fixme
-            left_q = weighted_percentile(y_train[left_ind], q)
-            right_q = weighted_percentile(y_train[right_ind], q)
+            left_q = weighted_quantile(y_train[left_ind], q)
+            right_q = weighted_quantile(y_train[right_ind], q)
 
             for curr_X, curr_y in [[X_train, y_train], [X_test, y_test]]:
                 actual_q = np.zeros(curr_X.shape[0])
@@ -41,7 +40,7 @@ def test_quantiles():
                 right_ind = curr_X[:, tree.feature[0]] > tree.threshold[0]
                 actual_q[right_ind] = right_q
 
-                expected_q = est.predict(curr_X, quantile=q)
+                expected_q = est.predict(curr_X, q=q)
                 assert_array_almost_equal(expected_q, actual_q)
 
 
@@ -52,12 +51,11 @@ def test_max_depth_None():
         est.set_params(max_depth=None)
         est.fit(X_train, y_train)
 
-        for quantile in [20, 40, 50, 60, 80, 90]:
-
+        for quantile in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
             for curr_X in [X_train, X_test]:
                 assert_array_almost_equal(
-                    est.predict(curr_X, quantile=None),
-                    est.predict(curr_X, quantile=quantile), 1)
+                    est.predict(curr_X, q=None),
+                    est.predict(curr_X, q=quantile), 1)
 
 
 def test_tree_toy_data():
@@ -75,10 +73,17 @@ def test_tree_toy_data():
     for est in estimators:
         est.set_params(max_depth=1)
         est.fit(X, y)
-        for quantile in [20, 30, 40, 50, 60, 70, 80]:
+        for quantile in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
             assert_array_almost_equal(
-                est.predict(x1, quantile=quantile),
-                [np.percentile(y1, quantile)], 3)
+                est.predict(x1, q=quantile),
+                [np.quantile(y1, quantile)], 3)
             assert_array_almost_equal(
-                est.predict(x2, quantile=quantile),
-                [np.percentile(y2, quantile)], 3)
+                est.predict(x2, q=quantile),
+                [np.quantile(y2, quantile)], 3)
+
+
+if __name__ == "skgarden.quantile.tests.test_tree" or __name__ == "__main__":
+    print("Test tree")
+    test_quantiles()
+    test_max_depth_None()
+    test_tree_toy_data()

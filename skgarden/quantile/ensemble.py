@@ -1,149 +1,251 @@
 from __future__ import division
+
 import numpy as np
-from numpy import ma
-from sklearn.ensemble import ExtraTreesRegressor
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.utils import check_array
-from sklearn.utils import check_random_state
-from sklearn.utils import check_X_y
+import pandas as pd
+from sklearn.tree import DecisionTreeRegressor, ExtraTreeRegressor
+from sklearn.utils import check_array, check_X_y
 
 from ..forest import ForestRegressor
-
-from .tree import DecisionTreeQuantileRegressor
-from .tree import ExtraTreeQuantileRegressor
-from .utils import weighted_percentile
-
-def generate_sample_indices(random_state, n_samples):
-    """
-    Generates bootstrap indices for each tree fit.
-
-    Parameters
-    ----------
-    random_state: int, RandomState instance or None
-        If int, random_state is the seed used by the random number generator.
-        If RandomState instance, random_state is the random number generator.
-        If None, the random number generator is the RandomState instance used
-        by np.random.
-
-    n_samples: int
-        Number of samples to generate from each tree.
-
-    Returns
-    -------
-    sample_indices: array-like, shape=(n_samples), dtype=np.int32
-        Sample indices.
-    """
-    random_instance = check_random_state(random_state)
-    sample_indices = random_instance.randint(0, n_samples, n_samples)
-    return sample_indices
+from .utils import _quantile_forest_predict, _weighted_random_sample, generate_sample_indices, set_tdigest, \
+    tdigestlist_quantile
+import dask.dataframe as dd
+import dask.array as da
 
 
-class BaseForestQuantileRegressor(ForestRegressor):
-    def fit(self, X, y):
-        """
-        Build a forest from the training set (X, y).
-
-        Parameters
-        ----------
-        X : array-like or sparse matrix, shape = [n_samples, n_features]
-            The training input samples. Internally, it will be converted to
-            ``dtype=np.float32`` and if a sparse matrix is provided
-            to a sparse ``csc_matrix``.
-
-        y : array-like, shape = [n_samples] or [n_samples, n_outputs]
-            The target values (class labels) as integers or strings.
-
-        sample_weight : array-like, shape = [n_samples] or None
-            Sample weights. If None, then samples are equally weighted. Splits
-            that would create child nodes with net zero or negative weight are
-            ignored while searching for a split in each node. Splits are also
-            ignored if they would result in any single class carrying a
-            negative weight in either child node.
-
-        check_input : boolean, (default=True)
-            Allow to bypass several input checking.
-            Don't use this parameter unless you know what you do.
-
-        X_idx_sorted : array-like, shape = [n_samples, n_features], optional
-            The indexes of the sorted training input samples. If many tree
-            are grown on the same dataset, this allows the ordering to be
-            cached between trees. If None, the data will be sorted here.
-            Don't use this parameter unless you know what to do.
-
-        Returns
-        -------
-        self : object
-            Returns self.
-        """
+class _DefaultForestQuantileRegressor(ForestRegressor):
+    def fit(self, X, y, sample_weight=None):
         # apply method requires X to be of dtype np.float32
         X, y = check_X_y(
-            X, y, accept_sparse="csc", dtype=np.float32, multi_output=False)
-        super(BaseForestQuantileRegressor, self).fit(X, y)
+            X, y, accept_sparse="csc", dtype=np.float32, multi_output=True)
+        super(_DefaultForestQuantileRegressor, self).fit(X, y, sample_weight=sample_weight)
 
-        self.y_train_ = y
-        self.y_train_leaves_ = -np.ones((self.n_estimators, len(y)), dtype=np.int32)
-        self.y_weights_ = np.zeros_like((self.y_train_leaves_), dtype=np.float32)
+        self.n_samples_ = len(y)
+        self.y_train_ = y.reshape((-1, self.n_outputs_)).astype(np.float32)
+        self.y_train_leaves_ = self.apply(X).T
+        self.y_weights_ = np.zeros_like(self.y_train_leaves_, dtype=np.float32)
+
+        if sample_weight is None:
+            sample_weight = np.ones(len(y))
 
         for i, est in enumerate(self.estimators_):
+            if self.verbose > 0:
+                print(f"Tree\t{i + 1}\tof\t{self.n_estimators}")
+
             if self.bootstrap:
                 bootstrap_indices = generate_sample_indices(
-                    est.random_state, len(y))
+                    est.random_state, self.n_samples_)
             else:
-                bootstrap_indices = np.arange(len(y))
+                bootstrap_indices = np.arange(self.n_samples_)
 
-            est_weights = np.bincount(bootstrap_indices, minlength=len(y))
-            y_train_leaves = est.y_train_leaves_
-            for curr_leaf in np.unique(y_train_leaves):
-                y_ind = y_train_leaves == curr_leaf
-                self.y_weights_[i, y_ind] = (
-                    est_weights[y_ind] / np.sum(est_weights[y_ind]))
+            df = pd.DataFrame({"weights": np.bincount(bootstrap_indices, minlength=self.n_samples_) * sample_weight,
+                               "leaves": self.y_train_leaves_[i, :]})
 
-            self.y_train_leaves_[i, bootstrap_indices] = y_train_leaves[bootstrap_indices]
+            self.y_weights_[i, :] = df.weights.values / df.groupby("leaves") \
+                .transform("sum", engine="numba", engine_kwargs={"parallel": True}) \
+                .values.squeeze()
+
+        self.y_train_leaves_[self.y_weights_ == 0] = -1
         return self
 
-    def predict(self, X, quantile=None):
-        """
-        Predict regression value for X.
-
-        Parameters
-        ----------
-        X : array-like or sparse matrix of shape = [n_samples, n_features]
-            The input samples. Internally, it will be converted to
-            ``dtype=np.float32`` and if a sparse matrix is provided
-            to a sparse ``csr_matrix``.
-
-        quantile : int, optional
-            Value ranging from 0 to 100. By default, the mean is returned.
-
-        check_input : boolean, (default=True)
-            Allow to bypass several input checking.
-            Don't use this parameter unless you know what you do.
-
-        Returns
-        -------
-        y : array of shape = [n_samples]
-            If quantile is set to None, then return E(Y | X). Else return
-            y such that F(Y=y | x) = quantile.
-        """
+    def predict(self, X, q=None):
         # apply method requires X to be of dtype np.float32
         X = check_array(X, dtype=np.float32, accept_sparse="csc")
-        if quantile is None:
-            return super(BaseForestQuantileRegressor, self).predict(X)
+        if q is None:
+            return super(_DefaultForestQuantileRegressor, self).predict(X)
+        elif q < 0 or q > 1:
+            raise ValueError("Quantile should be provided in range 0 to 1")
+        else:
+            q = np.float32(q)
 
-        sorter = np.argsort(self.y_train_)
         X_leaves = self.apply(X)
-        weights = np.zeros((X.shape[0], len(self.y_train_)))
-        quantiles = np.zeros((X.shape[0]))
-        for i, x_leaf in enumerate(X_leaves):
-            mask = self.y_train_leaves_ != np.expand_dims(x_leaf, 1)
-            x_weights = ma.masked_array(self.y_weights_, mask)
-            weights = x_weights.sum(axis=0)
-            quantiles[i] = weighted_percentile(
-                self.y_train_, quantile, weights, sorter)
-        return quantiles
+        return _quantile_forest_predict(X_leaves, self.y_train_, self.y_train_leaves_, self.y_weights_, q).squeeze()
 
 
-class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
+class _RandomSampleForestQuantileRegressor(ForestRegressor):
+    def fit(self, X, y, sample_weight=None):
+        # apply method requires X to be of dtype np.float32
+        X, y = check_X_y(
+            X, y, accept_sparse="csc", dtype=np.float32, multi_output=True)
+        super(_RandomSampleForestQuantileRegressor, self).fit(X, y, sample_weight=sample_weight)
+
+        if sample_weight is None:
+            sample_weight = np.ones(len(y))
+
+        self.n_samples_ = len(y)
+        y = y.reshape((-1, self.n_outputs_))
+
+        for i, est in enumerate(self.estimators_):
+            if self.verbose:
+                print(f"Tree\t{i + 1}\tof\t{self.n_estimators}")
+
+            if self.bootstrap:
+                bootstrap_indices = generate_sample_indices(
+                    est.random_state, self.n_samples_)
+            else:
+                bootstrap_indices = np.arange(self.n_samples_)
+
+            weights = np.bincount(bootstrap_indices, minlength=self.n_samples_) * sample_weight
+            mask = weights > 0
+
+            leaves = est.apply(X[mask])
+            idx = np.arange(len(leaves), dtype=np.int64)
+            y_masked = y[mask]
+
+            unique_leaves, sampled_idx = _weighted_random_sample(leaves, weights[mask], idx)
+
+            est.training_data_ = pd.DataFrame(y_masked[sampled_idx], index=unique_leaves)
+
+        return self
+
+    def predict(self, X, q=None):
+        # apply method requires X to be of dtype np.float32
+        X = check_array(X, dtype=np.float32, accept_sparse="csc")
+        if q is None:
+            return super(_RandomSampleForestQuantileRegressor, self).predict(X)
+
+        quantiles = np.empty((len(X), self.n_outputs_, self.n_estimators))
+        for i, est in enumerate(self.estimators_):
+            quantiles[:, :, i] = est.training_data_.loc[est.apply(X)].values
+
+        return np.quantile(quantiles, q=q, axis=-1).squeeze()
+
+
+class _TDigestForestQuantileRegressor(ForestRegressor):
+    def fit(self, X, y, sample_weight=None):
+        # apply method requires X to be of dtype np.float32
+        X, y = check_X_y(
+            X, y, accept_sparse="csc", dtype=np.float32, multi_output=True)
+        super(_TDigestForestQuantileRegressor, self).fit(X, y, sample_weight=sample_weight)
+
+        if sample_weight is None:
+            sample_weight = np.ones(len(y))
+
+        self.n_samples_ = len(y)
+        self.features = list(range(self.n_outputs_))
+        y = y.reshape((-1, self.n_outputs_))
+
+        for i, est in enumerate(self.estimators_):
+            if self.verbose > 0:
+                print(f"Tree\t{i + 1}\tof\t{self.n_estimators}")
+
+            if self.bootstrap:
+                bootstrap_indices = generate_sample_indices(
+                    est.random_state, self.n_samples_)
+            else:
+                bootstrap_indices = np.arange(self.n_samples_)
+
+            df = pd.DataFrame({"weights": np.bincount(bootstrap_indices, minlength=self.n_samples_) * sample_weight},
+                              index=est.apply(X))
+            df.loc[:, self.features] = y
+            df.index.name = "leaves"
+
+            df = df[df.weights > 0].groupby("leaves", sort=False, group_keys=False) \
+                      .apply(lambda x: pd.Series(
+                                         [set_tdigest(x[i].values, x.weights.values) for i in self.features]))
+
+            est.training_data_ = df
+
+        return self
+
+    def predict(self, X, q=None):
+        # apply method requires X to be of dtype np.float32
+        X = check_array(X, dtype=np.float32, accept_sparse="csc")
+        if q is None:
+            return super(_TDigestForestQuantileRegressor, self).predict(X)
+
+        quantile_stack = []
+
+        for i, est in enumerate(self.estimators_):
+            quantile_stack.append(est.training_data_.loc[est.apply(X)].reset_index())
+
+        df_quantiles = pd.concat(quantile_stack, axis=1)
+        quantiles = np.empty((len(X), self.n_outputs_))
+
+        for i in range(self.n_outputs_):
+            quantiles[:, i] = df_quantiles[i].apply(lambda x: tdigestlist_quantile(x, q), axis=1).values
+
+        return quantiles.squeeze()
+
+
+class _ForestQuantileRegressor:
+    """
+    Intermediate class, used for the mixing of the right regressor inheritance and
+    base_estimator selection. It also updates the __repr__ function to represent
+    both the 'method' and base_estimator.
+    """
+    # allowed options
+    methods = ['default', 'sample', 'tdigest']
+    base_estimators = ['random_forest', 'extra_trees']
+
+    def __new__(cls, method='default', type='random_forest', **kwargs):
+        if method == 'default':
+            base = _DefaultForestQuantileRegressor
+        elif method == 'sample':
+            base = _RandomSampleForestQuantileRegressor
+        elif method == 'tdigest':
+            base = _TDigestForestQuantileRegressor
+        else:
+            raise ValueError(f"Method not recognised, should be one of {_ForestQuantileRegressor.methods}")
+
+        if type == 'random_forest':
+            base_estimator = DecisionTreeRegressor()
+        elif type == 'extra_trees':
+            base_estimator = ExtraTreeRegressor()
+        else:
+            raise ValueError(f"Type not recognised, should be one of {_ForestQuantileRegressor.base_estimators}")
+
+        class BaseForestQuantileRegressor(base):
+            def __init__(self,
+                         n_estimators=10,
+                         criterion='mse',
+                         max_depth=None,
+                         min_samples_split=2,
+                         min_samples_leaf=1,
+                         min_weight_fraction_leaf=0.0,
+                         max_features='auto',
+                         max_leaf_nodes=None,
+                         bootstrap=True,
+                         oob_score=False,
+                         n_jobs=1,
+                         random_state=None,
+                         verbose=0,
+                         warm_start=False):
+                super(BaseForestQuantileRegressor, self).__init__(
+                    base_estimator=base_estimator,
+                    n_estimators=n_estimators,
+                    estimator_params=("criterion", "max_depth", "min_samples_split",
+                                      "min_samples_leaf", "min_weight_fraction_leaf",
+                                      "max_features", "max_leaf_nodes",
+                                      "random_state"),
+                    bootstrap=bootstrap,
+                    oob_score=oob_score,
+                    n_jobs=n_jobs,
+                    random_state=random_state,
+                    verbose=verbose,
+                    warm_start=warm_start)
+
+                self.criterion = criterion
+                self.max_depth = max_depth
+                self.min_samples_split = min_samples_split
+                self.min_samples_leaf = min_samples_leaf
+                self.min_weight_fraction_leaf = min_weight_fraction_leaf
+                self.max_features = max_features
+                self.max_leaf_nodes = max_leaf_nodes
+                self.method = method
+
+            def __repr__(self):
+                s = super(BaseForestQuantileRegressor, self).__repr__()
+                params = f"{s[s.find('('):-1]}, method='{method}')"
+                if type == "random_forest":
+                    class_name = 'RandomForestQuantileRegressor'
+                elif type == "extra_trees":
+                    class_name = 'ExtraTreesQuantileRegressor'
+                return class_name + params
+
+        return BaseForestQuantileRegressor(**kwargs)
+
+
+class RandomForestQuantileRegressor:
     """
     A random forest regressor that provides quantile estimates.
 
@@ -241,7 +343,7 @@ class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
 
     Attributes
     ----------
-    estimators_ : list of DecisionTreeQuantileRegressor
+    estimators_ : list of DecisionTreeRegressor
         The collection of fitted sub-estimators.
 
     feature_importances_ : array of shape = [n_features]
@@ -259,63 +361,57 @@ class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
     oob_prediction_ : array of shape = [n_samples]
         Prediction computed with out-of-bag estimate on the training set.
 
-    y_train_ : array-like, shape=(n_samples,)
-        Cache the target values at fit time.
+    method : str, ['default', 'sample', 'tdigest']
+        Method for the calculations. 'default' uses the method outlined in
+        the original paper. 'sample' uses the approach as currently used
+        in the R package quantRegForest. 'tdigest' stores information on
+        the distribution for each leaf and combines this information at
+        quantile calculation. 'default' has the highest precision but
+        is slower, 'tdigest' is an intermediate and 'sample' is relatively
+        fast (but needs most memory as samples of y are stored in each
+        estimator). Depending on the method additional attributes are stored
+        in the model.
 
-    y_weights_ : array-like, shape=(n_estimators, n_samples)
-        y_weights_[i, j] is the weight given to sample ``j` while
-        estimator ``i`` is fit. If bootstrap is set to True, this
-        reduces to a 2-D array of ones.
+        Default:
+            y_train_ : array-like, shape=(n_samples,)
+                Cache the target values at fit time.
 
-    y_train_leaves_ : array-like, shape=(n_estimators, n_samples)
-        y_train_leaves_[i, j] provides the leaf node that y_train_[i]
-        ends up when estimator j is fit. If y_train_[i] is given
-        a weight of zero when estimator j is fit, then the value is -1.
+            y_weights_ : array-like, shape=(n_estimators, n_samples)
+                y_weights_[i, j] is the weight given to sample ``j` while
+                estimator ``i`` is fit. If bootstrap is set to True, this
+                reduces to a 2-D array of ones.
+
+            y_train_leaves_ : array-like, shape=(n_estimators, n_samples)
+                y_train_leaves_[i, j] provides the leaf node that y_train_[i]
+                ends up when estimator j is fit. If y_train_[i] is given
+                a weight of zero when estimator j is fit, then the value is -1.
+
+        Sample:
+            each estimator contains
+
+            training_data_ : pd.DataFrame
+                The dataframe index contains the prediction leaf indices. One
+                column per n_outputs contains the sampled observation
+
+        TDigest:
+            each estimator contains
+
+            training_data_ : pd.DataFrame
+                The dataframe index contains the prediction leaf indices. One
+                column per n_outputs contains a TDigest object with information
+                on the distribution of the training observations in that leaf.
 
     References
     ----------
     .. [1] Nicolai Meinshausen, Quantile Regression Forests
         http://www.jmlr.org/papers/volume7/meinshausen06a/meinshausen06a.pdf
     """
-    def __init__(self,
-                 n_estimators=10,
-                 criterion='mse',
-                 max_depth=None,
-                 min_samples_split=2,
-                 min_samples_leaf=1,
-                 min_weight_fraction_leaf=0.0,
-                 max_features='auto',
-                 max_leaf_nodes=None,
-                 bootstrap=True,
-                 oob_score=False,
-                 n_jobs=1,
-                 random_state=None,
-                 verbose=0,
-                 warm_start=False):
-        super(RandomForestQuantileRegressor, self).__init__(
-            base_estimator=DecisionTreeQuantileRegressor(),
-            n_estimators=n_estimators,
-            estimator_params=("criterion", "max_depth", "min_samples_split",
-                              "min_samples_leaf", "min_weight_fraction_leaf",
-                              "max_features", "max_leaf_nodes",
-                              "random_state"),
-            bootstrap=bootstrap,
-            oob_score=oob_score,
-            n_jobs=n_jobs,
-            random_state=random_state,
-            verbose=verbose,
-            warm_start=warm_start)
 
-        self.criterion = criterion
-        self.max_depth = max_depth
-        self.min_samples_split = min_samples_split
-        self.min_samples_leaf = min_samples_leaf
-        self.min_weight_fraction_leaf = min_weight_fraction_leaf
-        self.max_features = max_features
-        self.max_leaf_nodes = max_leaf_nodes
+    def __new__(cls, *, method='default', **kwargs):
+        return _ForestQuantileRegressor(method=method, type='random_forest', **kwargs)
 
 
-class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
+class ExtraTreesQuantileRegressor:
     """
     An extra-trees regressor that provides quantile estimates.
 
@@ -410,10 +506,10 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
 
     Attributes
     ----------
-    estimators_ : list of ExtraTreeQuantileRegressor
+    estimators_ : list of ExtraTreeRegressor
         The collection of fitted sub-estimators.
 
-    feature_importances_ : array of shape = [n_features]
+    feature_importances_ : array of shape = (n_features)
         The feature importances (the higher, the more important the feature).
 
     n_features_ : int
@@ -425,60 +521,109 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
     oob_score_ : float
         Score of the training dataset obtained using an out-of-bag estimate.
 
-    oob_prediction_ : array of shape = [n_samples]
+    oob_prediction_ : array of shape = (n_samples)
         Prediction computed with out-of-bag estimate on the training set.
 
-    y_train_ : array-like, shape=(n_samples,)
-        Cache the target values at fit time.
+    method : str, ['default', 'sample', 'tdigest']
+        Method for the calculations. 'default' uses the method outlined in
+        the original paper. 'sample' uses the approach as currently used
+        in the R package quantRegForest. 'tdigest' stores information on
+        the distribution for each leaf and combines this information at
+        quantile calculation. 'default' has the highest precision but
+        is slower, 'tdigest' is an intermediate and 'sample' is relatively
+        fast (but needs most memory as samples of y are stored in each
+        estimator). Depending on the method additional attributes are stored
+        in the model.
 
-    y_weights_ : array-like, shape=(n_estimators, n_samples)
-        y_weights_[i, j] is the weight given to sample ``j` while
-        estimator ``i`` is fit. If bootstrap is set to True, this
-        reduces to a 2-D array of ones.
+        Default:
+            y_train_ : array-like, shape=(n_samples,)
+                Cache the target values at fit time.
 
-    y_train_leaves_ : array-like, shape=(n_estimators, n_samples)
-        y_train_leaves_[i, j] provides the leaf node that y_train_[i]
-        ends up when estimator j is fit. If y_train_[i] is given
-        a weight of zero when estimator j is fit, then the value is -1.
+            y_weights_ : array-like, shape=(n_estimators, n_samples)
+                y_weights_[i, j] is the weight given to sample ``j` while
+                estimator ``i`` is fit. If bootstrap is set to True, this
+                reduces to a 2-D array of ones.
+
+            y_train_leaves_ : array-like, shape=(n_estimators, n_samples)
+                y_train_leaves_[i, j] provides the leaf node that y_train_[i]
+                ends up when estimator j is fit. If y_train_[i] is given
+                a weight of zero when estimator j is fit, then the value is -1.
+
+        Sample:
+            each estimator contains
+
+            training_data_ : pd.DataFrame
+                The dataframe index contains the prediction leaf indices. One
+                column per n_outputs contains the sampled observation
+
+        TDigest:
+            each estimator contains
+
+            training_data_ : pd.DataFrame
+                The dataframe index contains the prediction leaf indices. One
+                column per n_outputs contains a TDigest object with information
+                on the distribution of the training observations in that leaf.
 
     References
     ----------
     .. [1] Nicolai Meinshausen, Quantile Regression Forests
         http://www.jmlr.org/papers/volume7/meinshausen06a/meinshausen06a.pdf
     """
-    def __init__(self,
-                 n_estimators=10,
-                 criterion='mse',
-                 max_depth=None,
-                 min_samples_split=2,
-                 min_samples_leaf=1,
-                 min_weight_fraction_leaf=0.0,
-                 max_features='auto',
-                 max_leaf_nodes=None,
-                 bootstrap=True,
-                 oob_score=False,
-                 n_jobs=1,
-                 random_state=None,
-                 verbose=0,
-                 warm_start=False):
-        super(ExtraTreesQuantileRegressor, self).__init__(
-            base_estimator=ExtraTreeQuantileRegressor(),
-            n_estimators=n_estimators,
-            estimator_params=("criterion", "max_depth", "min_samples_split",
-                              "min_samples_leaf", "min_weight_fraction_leaf",
-                              "max_features", "max_leaf_nodes",
-                              "random_state"),
-            bootstrap=bootstrap,
-            oob_score=oob_score,
-            n_jobs=n_jobs,
-            random_state=random_state,
-            verbose=verbose,
-            warm_start=warm_start)
 
-        self.criterion = criterion
-        self.max_depth = max_depth
-        self.min_samples_split = min_samples_split
-        self.min_samples_leaf = min_samples_leaf
-        self.min_weight_fraction_leaf = min_weight_fraction_leaf
-        self.max_features = max_features
-        self.max_leaf_nodes = max_leaf_nodes
+    def __new__(cls, *, method='default', **kwargs):
+        return _ForestQuantileRegressor(method=method, type='extra_trees', **kwargs)
+
+
+fit_docstring = \
+"""
+Build a forest from the training set (X, y).
+
+Parameters
+----------
+X : array-like or sparse matrix, shape = (n_samples, n_features)
+    The training input samples. Internally, it will be converted to
+    ``dtype=np.float32`` and if a sparse matrix is provided
+    to a sparse ``csc_matrix``.
+
+y : array-like, shape = (n_samples) or (n_samples, n_outputs)
+    The target values
+
+sample_weight : array-like, shape = (n_samples) or None
+    Sample weights. If None, then samples are equally weighted. Splits
+    that would create child nodes with net zero or negative weight are
+    ignored while searching for a split in each node. Splits are also
+    ignored if they would result in any single class carrying a
+    negative weight in either child node.
+
+Returns
+-------
+self : object
+    Returns self.    
+"""
+
+predict_docstring = \
+"""
+Predict quantile regression values for X.
+
+Parameters
+----------
+X : array-like or sparse matrix of shape = (n_samples, n_features)
+    The input samples. Internally, it will be converted to
+    ``dtype=np.float32`` and if a sparse matrix is provided
+    to a sparse ``csr_matrix``.
+
+q : float, optional
+    Value ranging from 0 to 1. By default, the mean is returned.
+
+Returns
+-------
+y : array of shape = (n_samples) or (n_samples, n_outputs)
+    If quantile is set to None, then return E(Y | X). Else return
+    y such that F(Y=y | x) = quantile.
+"""
+
+for Regressor in [_DefaultForestQuantileRegressor,
+                  _RandomSampleForestQuantileRegressor,
+                  _TDigestForestQuantileRegressor]:
+    Regressor.fit.__doc__ = fit_docstring
+    Regressor.predict.__doc__ = predict_docstring

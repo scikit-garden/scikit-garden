@@ -1,67 +1,28 @@
 import numpy as np
-
+import pandas as pd
 from sklearn.tree import BaseDecisionTree
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.tree import ExtraTreeRegressor
-from sklearn.utils import check_array
-from sklearn.utils import check_X_y
+from sklearn.utils import check_X_y, check_array
+from skgarden.quantile.utils import _quantile_tree_predict
 
-from .utils import weighted_percentile
 
 class BaseTreeQuantileRegressor(BaseDecisionTree):
-    def predict(self, X, quantile=None, check_input=False):
-        """
-        Predict regression value for X.
-
-        Parameters
-        ----------
-        X : array-like or sparse matrix of shape = [n_samples, n_features]
-            The input samples. Internally, it will be converted to
-            ``dtype=np.float32`` and if a sparse matrix is provided
-            to a sparse ``csr_matrix``.
-
-        quantile : int, optional
-            Value ranging from 0 to 100. By default, the mean is returned.
-
-        check_input : boolean, (default=True)
-            Allow to bypass several input checking.
-            Don't use this parameter unless you know what you do.
-
-        Returns
-        -------
-        y : array of shape = [n_samples]
-            If quantile is set to None, then return E(Y | X). Else return
-            y such that F(Y=y | x) = quantile.
-        """
-        # apply method requires X to be of dtype np.float32
-        X = check_array(X, dtype=np.float32, accept_sparse="csc")
-        if quantile is None:
-            return super(BaseTreeQuantileRegressor, self).predict(X, check_input=check_input)
-
-        quantiles = np.zeros(X.shape[0])
-        X_leaves = self.apply(X)
-        unique_leaves = np.unique(X_leaves)
-        for leaf in unique_leaves:
-            quantiles[X_leaves == leaf] = weighted_percentile(
-                self.y_train_[self.y_train_leaves_ == leaf], quantile)
-        return quantiles
-
-    def fit(self, X, y, sample_weight=None, check_input=True,
-            X_idx_sorted=None):
+    def fit(self, X, y, sample_weight=None, check_input=True, X_idx_sorted=None):
         """
         Build a decision tree classifier from the training set (X, y).
 
         Parameters
         ----------
-        X : array-like or sparse matrix, shape = [n_samples, n_features]
+        X : array-like or sparse matrix, shape = (n_samples, n_features)
             The training input samples. Internally, it will be converted to
             ``dtype=np.float32`` and if a sparse matrix is provided
             to a sparse ``csc_matrix``.
 
-        y : array-like, shape = [n_samples] or [n_samples, n_outputs]
-            The target values (class labels) as integers or strings.
+        y : array-like, shape = (n_samples) or (n_samples, n_outputs)
+            The target values.
 
-        sample_weight : array-like, shape = [n_samples] or None
+        sample_weight : array-like, shape = (n_samples) or None
             Sample weights. If None, then samples are equally weighted. Splits
             that would create child nodes with net zero or negative weight are
             ignored while searching for a split in each node. Splits are also
@@ -72,7 +33,7 @@ class BaseTreeQuantileRegressor(BaseDecisionTree):
             Allow to bypass several input checking.
             Don't use this parameter unless you know what you do.
 
-        X_idx_sorted : array-like, shape = [n_samples, n_features], optional
+        X_idx_sorted : array-like, shape = (n_samples, n_features), optional
             The indexes of the sorted training input samples. If many tree
             are grown on the same dataset, this allows the ordering to be
             cached between trees. If None, the data will be sorted here.
@@ -91,15 +52,56 @@ class BaseTreeQuantileRegressor(BaseDecisionTree):
 
         # apply method requires X to be of dtype np.float32
         X, y = check_X_y(
-            X, y, accept_sparse="csc", dtype=np.float32, multi_output=False)
+            X, y, accept_sparse="csc", dtype=np.float32, multi_output=True)
         super(BaseTreeQuantileRegressor, self).fit(
             X, y, sample_weight=sample_weight, check_input=check_input,
             X_idx_sorted=X_idx_sorted)
-        self.y_train_ = y
 
-        # Stores the leaf nodes that the samples lie in.
-        self.y_train_leaves_ = self.tree_.apply(X)
+        if sample_weight is None:
+            sample_weight = np.ones(len(y), dtype=np.float32)
+        else:
+            sample_weight = sample_weight.astype(np.float32)
+
+        self.n_samples_ = len(y)
+        self.y_train_ = y.reshape((-1, self.n_outputs_)).astype(np.float32)
+        self.y_weights_ = sample_weight
+        self.y_train_leaves_ = self.apply(X)
+
         return self
+
+    def predict(self, X, q=None, check_input=True):
+        """
+        Predict regression value for X.
+
+        Parameters
+        ----------
+        X : array-like or sparse matrix of shape = (n_samples, n_features)
+            The input samples. Internally, it will be converted to
+            ``dtype=np.float32`` and if a sparse matrix is provided
+            to a sparse ``csr_matrix``.
+
+        q : float, optional
+            Value ranging from 0 to 1. By default, the mean is returned.
+
+        check_input : boolean, (default=True)
+            Allow to bypass several input checking.
+            Don't use this parameter unless you know what you do.
+
+        Returns
+        -------
+        y : array of shape = (n_samples, n_outputs)
+            If quantile is set to None, then return E(Y | X). Else return
+            y such that F(Y=y | x) = quantile.
+        """
+        # apply method requires X to be of dtype np.float32
+        X = check_array(X, dtype=np.float32, accept_sparse="csc")
+        if q is None:
+            return super(BaseTreeQuantileRegressor, self).predict(X, check_input=check_input)
+        elif q < 0 or q > 1:
+            raise ValueError("Quantile should be provided in range 0 to 1")
+
+        X_leaves = self.apply(X)
+        return _quantile_tree_predict(X_leaves, self.y_train_, self.y_train_leaves_, self.y_weights_, q).squeeze()
 
 
 class DecisionTreeQuantileRegressor(DecisionTreeRegressor, BaseTreeQuantileRegressor):

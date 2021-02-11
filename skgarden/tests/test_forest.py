@@ -66,3 +66,12 @@ def test_min_variance():
     mean, std = rf.predict(X, return_std=True)
     assert_array_almost_equal(mean, y)
     assert_array_almost_equal(std, np.sqrt(0.1*np.ones(1000)))
+
+
+if __name__ == "skgarden.tests.test_forest":
+    print("Test forests")
+    test_min_variance()
+    for Regressor in [partial(RandomForestRegressor, bootstrap=False),
+                      ExtraTreesRegressor]:
+        check_variance_toy_data(Regressor)
+        check_variance_no_split(Regressor)

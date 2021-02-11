@@ -19,6 +19,12 @@ X_test = np.array(X_test, dtype=np.float32)
 estimators = [
     RandomForestQuantileRegressor(random_state=0),
     ExtraTreesQuantileRegressor(random_state=0)]
+approx_estimators = [
+    RandomForestQuantileRegressor(random_state=0, method='sample', n_estimators=250),
+    ExtraTreesQuantileRegressor(random_state=0, method='sample', n_estimators=250),
+    RandomForestQuantileRegressor(random_state=0, method='tdigest', n_estimators=250),
+    ExtraTreesQuantileRegressor(random_state=0, method='tdigest', n_estimators=250)
+]
 
 
 def test_quantile_attributes():
@@ -41,9 +47,10 @@ def test_quantile_attributes():
         n_est = est.n_estimators
         est.set_params(bootstrap=False)
         est.fit(X_train, y_train)
-        assert_array_equal(
+        assert_array_almost_equal(
             np.sum(est.y_weights_, axis=1),
-            [sum(tree.tree_.children_left == -1) for tree in est.estimators_]
+            [sum(tree.tree_.children_left == -1) for tree in est.estimators_],
+            6
         )
         assert np.all(est.y_train_leaves_ != -1)
 
@@ -62,8 +69,8 @@ def test_tree_forest_equivalence():
 
     assert np.all(rfqr.y_train_leaves_ == dtqr.y_train_leaves_)
     assert_array_almost_equal(
-        rfqr.predict(X_test, quantile=10),
-        dtqr.predict(X_test, quantile=10), 5)
+        rfqr.predict(X_test, q=0.1),
+        dtqr.predict(X_test, q=0.1), 5)
 
 
 def test_max_depth_None_rfqr():
@@ -71,39 +78,23 @@ def test_max_depth_None_rfqr():
     # the mean equals any quantile.
     rng = np.random.RandomState(0)
     X = rng.randn(10, 1)
-    y = np.linspace(0.0, 100.0, 10.0)
+    y = np.linspace(0.0, 100.0, 10)
 
-    rfqr = RandomForestQuantileRegressor(
-        random_state=0, bootstrap=False, max_depth=None)
-    rfqr.fit(X, y)
+    rfqr_estimators = [
+        RandomForestQuantileRegressor(random_state=0, bootstrap=False, max_depth=None),
+        RandomForestQuantileRegressor(random_state=0, bootstrap=False, max_depth=None, method='sample')
+    ]
+    for rfqr in rfqr_estimators:
+        rfqr.fit(X, y)
 
-    for quantile in [20, 40, 50, 60, 80, 90]:
-        assert_array_almost_equal(
-            rfqr.predict(X, quantile=None),
-            rfqr.predict(X, quantile=quantile), 5)
-
-
-def test_base_forest_quantile():
-    """
-    Test that the base estimators belong to the correct class.
-    """
-    rng = np.random.RandomState(0)
-    X = rng.randn(10, 1)
-    y = np.linspace(0.0, 100.0, 10.0)
-
-    rfqr = RandomForestQuantileRegressor(random_state=0, max_depth=1)
-    rfqr.fit(X, y)
-    for est in rfqr.estimators_:
-        assert isinstance(est, DecisionTreeQuantileRegressor)
-
-    etqr = ExtraTreesQuantileRegressor(random_state=0, max_depth=1)
-    etqr.fit(X, y)
-    for est in etqr.estimators_:
-        assert isinstance(est, ExtraTreeQuantileRegressor)
+        for quantile in (0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 1):
+            assert_array_almost_equal(
+                rfqr.predict(X, q=None),
+                rfqr.predict(X, q=quantile), 5)
 
 
 def test_forest_toy_data():
-    rng = np.random.RandomState(1)
+    rng = np.random.RandomState(105)
     x1 = rng.randn(1, 10)
     X1 = np.tile(x1, (10000, 1))
     x2 = 20.0 * rng.randn(1, 10)
@@ -117,10 +108,30 @@ def test_forest_toy_data():
     for est in estimators:
         est.set_params(max_depth=1)
         est.fit(X, y)
-        for quantile in [20, 30, 40, 50, 60, 70, 80]:
+        for quantile in (0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 1):
             assert_array_almost_equal(
-                est.predict(x1, quantile=quantile),
-                [np.percentile(y1, quantile)], 3)
+                est.predict(x1, q=quantile),
+                [np.quantile(y1, quantile)], 3)
             assert_array_almost_equal(
-                est.predict(x2, quantile=quantile),
-                [np.percentile(y2, quantile)], 3)
+                est.predict(x2, q=quantile),
+                [np.quantile(y2, quantile)], 3)
+
+    # the approximate methods have a lower precision, which is to be expected
+    for est in approx_estimators:
+        est.set_params(max_depth=1)
+        est.fit(X, y)
+        for quantile in (0.2, 0.3, 0.5, 0.7):
+            assert_array_almost_equal(
+                est.predict(x1, q=quantile),
+                [np.quantile(y1, quantile)], 0)
+            assert_array_almost_equal(
+                est.predict(x2, q=quantile),
+                [np.quantile(y2, quantile)], 0)
+
+
+if __name__ == "skgarden.quantile.tests.test_ensemble":
+    print("Test ensemble")
+    test_quantile_attributes()
+    test_tree_forest_equivalence()
+    test_max_depth_None_rfqr()
+    test_forest_toy_data()
