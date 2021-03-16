@@ -11,8 +11,8 @@ from joblib import delayed, Parallel
 from ..tree import MondrianTreeClassifier
 from ..tree import MondrianTreeRegressor
 
-from ...forest import ForestClassifier
-from ...forest import ForestRegressor
+from sklearn.ensemble._forest import ForestClassifier
+from sklearn.ensemble._forest import ForestRegressor
 
 def _single_tree_pfit(tree, X, y, classes=None):
     if classes is not None:

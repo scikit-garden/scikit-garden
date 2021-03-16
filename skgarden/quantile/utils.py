@@ -1,8 +1,6 @@
 import numpy as np
-from crick.tdigest import TDigest
 from numba import jit, float32, float64, int64, prange
 import numba as nb
-from sklearn.utils import check_random_state
 
 
 @jit(float32[:](float32[:, :], float32, float32[:]), nopython=True, cache=True)
@@ -49,7 +47,6 @@ def _weighted_quantile(a, q, weights):
         sorted_indices = np.argsort(a[:, i])
         sorted_a = a[sorted_indices, i]
         sorted_weights = weights[sorted_indices]
-
 
         # Step 1
         sorted_cum_weights = np.cumsum(sorted_weights)
@@ -155,29 +152,6 @@ def _quantile_forest_predict(X_leaves, y_train, y_train_leaves, y_weights, q):
     return quantiles
 
 
-@jit(nopython=True, cache=True)
-def rand_choice_nb(a, p):
-    """
-    Random choice from array with probabilities per sample
-
-    Parameters
-    ----------
-    a : np.array
-        Data
-    p : float
-        Probability of each observation. Should sum up to 1.
-
-    Returns
-    -------
-    A random sample from the given array with a given probability.
-
-    References
-    ----------
-    - https://github.com/numba/numba/issues/2539
-    """
-    return a[np.searchsorted(np.cumsum(p), np.random.random(), side="right")]
-
-
 @jit(nb.types.containers.UniTuple(int64[:], 2)(int64[:], float64[:], int64[:]), nopython=True, cache=True)
 def _weighted_random_sample(leaves, weights, idx):
     """
@@ -188,7 +162,7 @@ def _weighted_random_sample(leaves, weights, idx):
     leaves : array, shape = (n_samples)
         Leaves of a Regression tree, corresponding to weights and indices (idx)
     weights : array, shape = (n_samples)
-        Weights for each observation. They don't need to sum up to 1.
+        Weights for each observation. They need to sum up to 1 per unique leaf.
     idx : array, shape = (n_samples)
         Indices of original observations. The output will drawn from this.
 
@@ -200,73 +174,22 @@ def _weighted_random_sample(leaves, weights, idx):
     """
     unique_leaves = np.unique(leaves)
     sampled_idx = np.empty_like(unique_leaves, dtype=np.int64)
+
     for i in prange(len(unique_leaves)):
         mask = unique_leaves[i] == leaves
         c_weights = weights[mask]
         c_idx = idx[mask]
-        sampled_idx[i] = rand_choice_nb(c_idx, p=c_weights/c_weights.sum())
+
+        if c_idx.size == 1:
+            sampled_idx[i] = c_idx[0]
+            continue
+
+        p = 0
+        r = np.random.rand()
+        for j in range(len(c_idx)):
+            p += c_weights[j]
+            if p > r:
+                sampled_idx[i] = c_idx[j]
+                break
+
     return unique_leaves, sampled_idx
-
-
-def generate_sample_indices(random_state, n_samples):
-    """
-    Generates bootstrap indices for each tree fit.
-
-    Parameters
-    ----------
-    random_state: int, RandomState instance or None
-        If int, random_state is the seed used by the random number generator.
-        If RandomState instance, random_state is the random number generator.
-        If None, the random number generator is the RandomState instance used
-        by np.random.
-
-    n_samples: int
-        Number of samples to generate from each tree.
-
-    Returns
-    -------
-    sample_indices: array-like, shape=(n_samples), dtype=np.int32
-        Sample indices.
-    """
-    random_instance = check_random_state(random_state)
-    sample_indices = random_instance.randint(0, n_samples, n_samples)
-    return sample_indices
-
-
-def set_tdigest(x, w):
-    """
-    Create TDigest object and insert weighted data
-
-    Parameters
-    ----------
-    x : array, shape = (n_samples)
-        Data to be inserted to the TDigest object
-    w : array, shape = (n_samples)
-        Weights per data point
-
-    Returns
-    -------
-    TDigest
-    """
-    t = TDigest()
-    t.update(x, w)
-    return t
-
-
-def tdigestlist_quantile(t_list, q):
-    """
-    Merge TDigest objects and calculate quantile
-
-    Parameters
-    ----------
-    t_list : array-like
-        TDigest objects that will be merged
-    q : float
-        Quantile to be calculated from the merged TDigest, range 0 to 1.
-
-    Returns
-    Quantile
-    """
-    t = TDigest()
-    t.merge(*(t_list.values))
-    return t.quantile(q)

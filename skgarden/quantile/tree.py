@@ -3,7 +3,7 @@ from sklearn.tree import BaseDecisionTree
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.tree import ExtraTreeRegressor
 from sklearn.utils import check_X_y, check_array
-from skgarden.quantile.utils import _quantile_tree_predict
+from .utils import _quantile_tree_predict
 
 
 class BaseTreeQuantileRegressor(BaseDecisionTree):

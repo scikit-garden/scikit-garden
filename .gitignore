@@ -1,6 +1,12 @@
 *.py[co]
 *~
+*__pycache__/
 .ipynb_checkpoints/
+skgarden_base
+scratch
+skgarden/tests/run.py
+*.DS_Store
+
 # created by installing scikit-learn from git
 src/*
 build/

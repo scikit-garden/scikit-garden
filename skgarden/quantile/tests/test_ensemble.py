@@ -20,8 +20,6 @@ estimators = [
 approx_estimators = [
     RandomForestQuantileRegressor(random_state=0, method='sample', n_estimators=250),
     ExtraTreesQuantileRegressor(random_state=0, method='sample', n_estimators=250),
-    RandomForestQuantileRegressor(random_state=0, method='tdigest', n_estimators=250),
-    ExtraTreesQuantileRegressor(random_state=0, method='tdigest', n_estimators=250)
 ]
 
 
@@ -87,7 +85,7 @@ def test_max_depth_None_rfqr():
 
         for quantile in (0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 1):
             assert_array_almost_equal(
-                rfqr.predict(X, q=None),
+                rfqr.predict(X, q=0.5),
                 rfqr.predict(X, q=quantile), 5)
 
 
