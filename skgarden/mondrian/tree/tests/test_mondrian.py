@@ -16,14 +16,10 @@ from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.utils.testing import assert_array_equal
-from sklearn.utils.testing import assert_array_almost_equal
-from sklearn.utils.testing import assert_almost_equal
-from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_false
-from sklearn.utils.testing import assert_greater
-from sklearn.utils.testing import assert_less
-from sklearn.utils.testing import assert_true
+from numpy.testing import assert_array_equal
+from numpy.testing import assert_array_almost_equal
+from numpy.testing import assert_almost_equal
+from numpy.testing import assert_equal
 
 from skgarden.mondrian import MondrianTreeClassifier
 from skgarden.mondrian import MondrianTreeRegressor
@@ -128,11 +124,11 @@ def test_reg_boston():
     X, y = boston.data, boston.target
     mtr.fit(X, y)
     score = mean_squared_error(mtr.predict(X), y)
-    assert_less(score, 1, "Failed with score = {0}".format(score))
+    assert score < 1, "Failed with score = {0}".format(score)
 
     mtr.partial_fit(X, y)
     score = mean_squared_error(mtr.predict(X), y)
-    assert_less(score, 1, "Failed with score = {0}".format(score))
+    assert score < 1, "Failed with score = {0}".format(score)
 
 
 def test_array_repr():
@@ -193,7 +189,7 @@ def test_min_samples_split():
         est.set_params(min_samples_split=10, max_depth=None)
         est.fit(X, y)
         n_node_samples = est.tree_.n_node_samples[est.tree_.children_left != -1]
-        assert_less(9, np.min(n_node_samples))
+        assert 9 < np.min(n_node_samples)
 
 
 def test_tau():
@@ -365,8 +361,8 @@ def test_std_positive():
          [2.97979798],
          [3.08080808]])
     _, y_std = mr.predict(X_test, return_std=True)
-    assert_false(np.any(np.isnan(y_std)))
-    assert_false(np.any(np.isinf(y_std)))
+    assert not np.any(np.isnan(y_std))
+    assert not np.any(np.isinf(y_std))
 
 
 def check_mean_std_reg_convergence(est, X_train, y_train):
@@ -474,14 +470,14 @@ def test_apply():
         est_clone.fit(X_train, y_train)
         train_leaves = est_clone.tree_.children_left[est_clone.apply(X_train)]
         test_leaves = est_clone.tree_.children_left[est_clone.apply(X_test)]
-        assert_true(np.all(train_leaves == -1))
-        assert_true(np.all(test_leaves == -1))
+        assert np.all(train_leaves == -1)
+        assert np.all(test_leaves == -1)
 
         est_clone.partial_fit(X_train, y_train)
         train_leaves = est_clone.tree_.children_left[est_clone.apply(X_train)]
         test_leaves = est_clone.tree_.children_left[est_clone.apply(X_test)]
-        assert_true(np.all(train_leaves == -1))
-        assert_true(np.all(test_leaves == -1))
+        assert np.all(train_leaves == -1)
+        assert np.all(test_leaves == -1)
 
 def check_pickle(est, X, y):
     score1 = est.score(X, y)
@@ -522,4 +518,4 @@ def test_tree_identical_labels():
         y = np.array([0.0]*50 + [1.0]*50)
         c_est.fit(X, y)
         leaf_ids = c_est.tree_.children_left == -1
-        assert_true(np.any(c_est.tree_.n_node_samples[leaf_ids] > 2))
+        assert np.any(c_est.tree_.n_node_samples[leaf_ids] > 2)

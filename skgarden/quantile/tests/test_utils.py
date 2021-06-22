@@ -1,9 +1,9 @@
 import numpy as np
 from skgarden.quantile.utils import weighted_percentile
 
-from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_array_almost_equal
-from sklearn.utils.testing import assert_almost_equal
+from numpy.testing import assert_equal
+from numpy.testing import assert_array_almost_equal
+from numpy.testing import assert_almost_equal
 
 def test_percentile_equal_weights():
     rng = np.random.RandomState(0)

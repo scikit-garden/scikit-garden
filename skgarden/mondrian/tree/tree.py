@@ -28,7 +28,6 @@ from scipy.sparse import issparse
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
 from sklearn.base import RegressorMixin
-from sklearn.externals import six
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
 from sklearn.utils import compute_sample_weight
@@ -37,6 +36,8 @@ from sklearn.utils.validation import check_array
 from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.validation import check_X_y
 from sklearn.exceptions import NotFittedError
+
+import six
 
 from ._criterion import Criterion
 from ._splitter import Splitter
