@@ -10,3 +10,4 @@ dist/
 *.c
 *.so
 site/
+.env/*

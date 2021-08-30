@@ -16,12 +16,10 @@ from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.utils.testing import assert_array_equal
-from sklearn.utils.testing import assert_array_almost_equal
-from sklearn.utils.testing import assert_almost_equal
-from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_greater
-from sklearn.utils.testing import assert_less
+from numpy.testing import assert_array_equal
+from numpy.testing import assert_array_almost_equal
+from numpy.testing import assert_almost_equal
+from numpy.testing import assert_equal
 
 from skgarden.mondrian import MondrianTreeClassifier
 from skgarden.mondrian import MondrianTreeRegressor
@@ -126,11 +124,11 @@ def test_reg_boston():
     X, y = boston.data, boston.target
     mtr.fit(X, y)
     score = mean_squared_error(mtr.predict(X), y)
-    assert_less(score, 1, "Failed with score = {0}".format(score))
+    assert score < 1, "Failed with score = {0}".format(score)
 
     mtr.partial_fit(X, y)
     score = mean_squared_error(mtr.predict(X), y)
-    assert_less(score, 1, "Failed with score = {0}".format(score))
+    assert score < 1, "Failed with score = {0}".format(score)
 
 
 def test_array_repr():
@@ -191,7 +189,7 @@ def test_min_samples_split():
         est.set_params(min_samples_split=10, max_depth=None)
         est.fit(X, y)
         n_node_samples = est.tree_.n_node_samples[est.tree_.children_left != -1]
-        assert_less(9, np.min(n_node_samples))
+        assert 9 < np.min(n_node_samples)
 
 
 def test_tau():

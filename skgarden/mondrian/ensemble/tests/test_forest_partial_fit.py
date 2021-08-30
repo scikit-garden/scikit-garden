@@ -2,9 +2,8 @@ import numpy as np
 from sklearn.datasets import load_digits
 from sklearn.datasets import make_classification
 from sklearn.datasets import make_regression
-from sklearn.utils.testing import assert_array_equal
-from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_greater
+from numpy.testing import assert_array_equal
+from numpy.testing import assert_equal
 
 from skgarden import MondrianForestRegressor
 from skgarden import MondrianForestClassifier
@@ -78,11 +77,11 @@ def test_min_samples_split():
         mfr.partial_fit(X_r[X_r.shape[0] // 2:], y_r[X_r.shape[0] // 2:])
         for est in mfr.estimators_:
             n_node_samples = est.tree_.n_node_samples[est.tree_.children_left != -1]
-            assert_greater(np.min(n_node_samples) + 1, mss)
+            assert np.min(n_node_samples) + 1 > mss
 
         mfc = MondrianForestClassifier(random_state=0, min_samples_split=mss)
         mfc.partial_fit(X_c[: X_c.shape[0] // 2], y_c[: X_c.shape[0] // 2])
         mfc.partial_fit(X_c[X_c.shape[0] // 2:], y_c[X_c.shape[0] // 2:])
         for est in mfc.estimators_:
             n_node_samples = est.tree_.n_node_samples[est.tree_.children_left != -1]
-            assert_greater(np.min(n_node_samples) + 1, mss)
+            assert np.min(n_node_samples) + 1 > mss
