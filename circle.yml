@@ -2,21 +2,22 @@ machine:
   python:
     version: 3.5.1
 
-# dependencies:
-#   override:
-#     - bash ./build_tools/circle/install.sh:
+dependencies:
+  override:
+    - bash ./build_tools/circle/install.sh:
 
-test:
-  commands:
-    - bash ./build_tools/circle/build.sh
+jobs:
+  test:
+    commands:
+      - bash ./build_tools/circle/build.sh
 
-deployment:
- push:
-   branch: master
-   commands:
-     - bash ./build_tools/circle/deploy.sh
+  deployment:
+   push:
+     branch: master
+     commands:
+       - bash ./build_tools/circle/deploy.sh
 
-# general:
-#   # Open the doc to the API
-#   artifacts:
-#     - ~/site
+  general:
+    # Open the doc to the API
+    artifacts:
+      - ~/site
