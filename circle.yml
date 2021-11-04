@@ -11,7 +11,7 @@ jobs:
     steps:
       - run:
          name: Download Selenium
-         command: <<include(build_tools/circle/build.sh)>>
+         command: "<<include(build_tools/circle/build.sh)>>"
 
 #   deployment:
 #     machine: True
