@@ -1,8 +1,5 @@
 version: 2.1
 
-machine:
-  python:
-    version: 3.5.1
 
 dependencies:
   override:
@@ -10,13 +7,19 @@ dependencies:
 
 jobs:
   test:
-    commands:
+    machine:
+      python:
+        version: 3.5.1
+    steps:
       - bash ./build_tools/circle/build.sh
 
   deployment:
-   push:
-     branch: master
-     commands:
+    machine:
+      python:
+        version: 3.5.1
+    push:
+      branch: master
+    steps:
        - bash ./build_tools/circle/deploy.sh
 
   general:
