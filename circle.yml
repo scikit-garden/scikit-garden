@@ -9,12 +9,15 @@ jobs:
   build_and_test:
     machine: True
     steps:
-      - run ./build_tools/circle/build.sh
+      - run:
+        command: bash ./build_tools/circle/build.sh
+
 
   deployment:
     machine: True
     steps:
-      - run ./build_tools/circle/deploy.sh
+      - run:
+        command: bash ./build_tools/circle/deploy.sh
 
   general:
     # Open the doc to the API
