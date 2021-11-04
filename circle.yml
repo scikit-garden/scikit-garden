@@ -3,18 +3,18 @@ version: 2.1
 
 dependencies:
   override:
-    - bash ./build_tools/circle/install.sh:
+    - bash build_tools/circle/install.sh:
 
 jobs:
   build_and_test:
     machine: True
     steps:
-      - bash ./build_tools/circle/build.sh
+      - bash build_tools/circle/build.sh
 
   deployment:
     machine: True
     steps:
-      - bash ./build_tools/circle/deploy.sh
+      - bash build_tools/circle/deploy.sh
 
   general:
     # Open the doc to the API
