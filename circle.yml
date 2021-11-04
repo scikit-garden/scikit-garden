@@ -13,25 +13,25 @@ jobs:
         command: bash ./build_tools/circle/build.sh
 
 
-  deployment:
-    machine: True
-    steps:
-      - run:
-        command: bash ./build_tools/circle/deploy.sh
+#   deployment:
+#     machine: True
+#     steps:
+#       - run:
+#         command: bash ./build_tools/circle/deploy.sh
 
-  general:
-    # Open the doc to the API
-    machine: True
-    steps:
-      - store_artifacts:
-        path: /bin/final_build
+#   general:
+#     # Open the doc to the API
+#     machine: True
+#     steps:
+#       - store_artifacts:
+#         path: /bin/final_build
 
 workflows:
   build_and_deploy:
     jobs:
       - build_and_test
-      - deployment:
-          filters:
-            branches:
-              only: master 
-      - general
+#       - deployment:
+#           filters:
+#             branches:
+#               only: master 
+#       - general
