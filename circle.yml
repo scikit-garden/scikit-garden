@@ -16,7 +16,7 @@ deployment:
    commands:
      - bash ./build_tools/circle/deploy.sh
 
-general:
-  # Open the doc to the API
-  artifacts:
-    - ~/site
+# general:
+#   # Open the doc to the API
+#   artifacts:
+#     - ~/site
