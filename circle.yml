@@ -10,7 +10,8 @@ jobs:
     machine: True
     steps:
       - run:
-        command: bash ./build_tools/circle/build.sh
+         name: Download Selenium
+         command: ./build_tools/circle/build.sh
 
 
 #   deployment:
