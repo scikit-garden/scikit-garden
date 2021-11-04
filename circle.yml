@@ -21,3 +21,10 @@ jobs:
     # Open the doc to the API
     artifacts:
       - ~/site
+
+workflows:
+  test_and_deploy:
+    jobs:
+      - test
+      - deployment
+      - general
