@@ -2,9 +2,9 @@ machine:
   python:
     version: 3.5.1
 
-dependencies:
-  override:
-    - bash ./build_tools/circle/install.sh:
+# dependencies:
+#   override:
+#     - bash ./build_tools/circle/install.sh:
 
 test:
   commands:
