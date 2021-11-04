@@ -14,12 +14,14 @@ jobs:
   deployment:
     machine: True
     steps:
-       - bash ./build_tools/circle/deploy.sh
+      - bash ./build_tools/circle/deploy.sh
 
   general:
     # Open the doc to the API
-    artifacts:
-      - ~/site
+    machine: True
+    steps:
+      - store_artifacts:
+        path: /bin/final_build
 
 workflows:
   build_and_deploy:
