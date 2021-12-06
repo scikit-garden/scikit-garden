@@ -6,14 +6,14 @@ jobs:
       - image: circleci/python:3.7
     steps:
       - run:
-        name: dependencies
-        command: ./build_tools/circle/install.sh
+          name: dependencies
+          command: ./build_tools/circle/install.sh
       - run:
-        name: test
-        command: ./build_tools/circle/build.sh
+          name: test
+          command: ./build_tools/circle/build.sh
       - run:
-        name: deployment
-        command: ./build_tools/circle/deploy.sh
+          name: deployment
+          command: ./build_tools/circle/deploy.sh
       - artifacts:
           # Open the doc to the API
           path: ~/site
