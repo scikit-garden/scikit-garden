@@ -8,13 +8,13 @@ jobs:
       - checkout
       - run:
           name: dependencies
-          command: ./build_tools/circle/install.sh
+          command: bash ./build_tools/circle/install.sh
       - run:
           name: test
-          command: ./build_tools/circle/build.sh
+          command: bash ./build_tools/circle/build.sh
       - run:
           name: deployment
-          command: ./build_tools/circle/deploy.sh
+          command: bash ./build_tools/circle/deploy.sh
       - store_artifacts:
           # Open the doc to the API
           path: ~/site
