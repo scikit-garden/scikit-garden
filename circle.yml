@@ -1,7 +1,7 @@
 version: 2.1
 
 jobs:
-  lint:
+  deploy:
     docker:
       - image: circleci/python:3.7
     steps:
@@ -17,3 +17,9 @@ jobs:
       - artifacts:
           # Open the doc to the API
           path: ~/site
+
+workflows:
+  version: 2
+  build-and-deploy:
+      jobs:
+      - deploy
