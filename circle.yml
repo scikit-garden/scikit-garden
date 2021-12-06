@@ -4,8 +4,11 @@ jobs:
   deploy:
     docker:
       - image: circleci/python:3.7
+    environment:
+      - CIRCLE_ARTIFACTS: /tmp/circle_artifacts
     steps:
       - checkout
+      - run: mkdir -p $CIRCLE_ARTIFACTS
       - run:
           name: dependencies
           command: bash ./build_tools/circle/install.sh
