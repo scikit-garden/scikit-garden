@@ -39,7 +39,7 @@ def generate_sample_indices(random_state, n_samples):
 
 
 class BaseForestQuantileRegressor(ForestRegressor):
-    def fit(self, X, y):
+    def fit(self, X, y, sample_weight=None):
         """
         Build a forest from the training set (X, y).
 
@@ -78,7 +78,7 @@ class BaseForestQuantileRegressor(ForestRegressor):
         # apply method requires X to be of dtype np.float32
         X, y = check_X_y(
             X, y, accept_sparse="csc", dtype=np.float32, multi_output=False)
-        super(BaseForestQuantileRegressor, self).fit(X, y)
+        super(BaseForestQuantileRegressor, self).fit(X, y, sample_weight=sample_weight)
 
         self.y_train_ = y
         self.y_train_leaves_ = -np.ones((self.n_estimators, len(y)), dtype=np.int32)
