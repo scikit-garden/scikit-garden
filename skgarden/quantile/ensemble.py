@@ -1,11 +1,14 @@
 from __future__ import division
 import numpy as np
 from numpy import ma
+import threading
 from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.utils import check_array
 from sklearn.utils import check_random_state
 from sklearn.utils import check_X_y
+from joblib import delayed, Parallel
+
 
 from ..forest import ForestRegressor
 
@@ -101,24 +104,56 @@ class BaseForestQuantileRegressor(ForestRegressor):
             self.y_train_leaves_[i, bootstrap_indices] = y_train_leaves[bootstrap_indices]
         return self
 
+    def _bin_after_fit(i, est, y, bootstrap):
+        if bootstrap:
+            bootstrap_indices = generate_sample_indices(
+                est.random_state, len(y))
+        else:
+            bootstrap_indices = np.arange(len(y))
+
+        est_weights = np.bincount(bootstrap_indices, minlength=len(y))
+        y_train_leaves = est.y_train_leaves_
+
+        # TODO: probably can acheive better parallelism by parallelizing
+        # at the leaf-level, rather than the tree level
+
+        y_weights = np.zeros_like(y_train_leaves, dtype=np.float32)
+        for curr_leaf in np.unique(y_train_leaves):
+            y_ind = y_train_leaves == curr_leaf
+            y_weights[y_ind] = (
+                    est_weights[y_ind] / np.sum(est_weights[y_ind])
+            )
+
+        return i, y_weights, y_train_leaves, bootstrap_indices
+
+    def _weights_single_tree(self, y_train_leaves_, y_weights_, j, x_tree, weights, lock):
+        """
+        Compute the weights for a single tree
+        :param j: the index of a single tree
+        :param x_tree: a vector of size n_samples, ie number of predictions to be made
+        """
+        mask = y_train_leaves_[j, :] == np.expand_dims(x_tree, 1)
+        new_weights = (
+                np.tile(y_weights_[j, :], (len(x_tree), 1)) * mask
+        # TODO: Hmm, does this break multi-response regression?
+        )
+        with lock:
+            weights += new_weights
+
     def predict(self, X, quantile=None):
         """
         Predict regression value for X.
-
         Parameters
         ----------
         X : array-like or sparse matrix of shape = [n_samples, n_features]
             The input samples. Internally, it will be converted to
             ``dtype=np.float32`` and if a sparse matrix is provided
             to a sparse ``csr_matrix``.
-
         quantile : int, optional
             Value ranging from 0 to 100. By default, the mean is returned.
-
         check_input : boolean, (default=True)
             Allow to bypass several input checking.
             Don't use this parameter unless you know what you do.
-
         Returns
         -------
         y : array of shape = [n_samples]
@@ -131,15 +166,22 @@ class BaseForestQuantileRegressor(ForestRegressor):
             return super(BaseForestQuantileRegressor, self).predict(X)
 
         sorter = np.argsort(self.y_train_)
-        X_leaves = self.apply(X)
+        X_leaves = self.apply(X)  # X_leaves.shape -> (n_samples, n_estimators)
         weights = np.zeros((X.shape[0], len(self.y_train_)))
         quantiles = np.zeros((X.shape[0]))
-        for i, x_leaf in enumerate(X_leaves):
-            mask = self.y_train_leaves_ != np.expand_dims(x_leaf, 1)
-            x_weights = ma.masked_array(self.y_weights_, mask)
-            weights = x_weights.sum(axis=0)
+
+        # NB: Here, we use a lock, as in https://github.com/scikit-learn/scikit-learn/blob/bac89c2/sklearn/ensemble/forest.py#L593,
+        # TODO: Give user the option to go without a lock, at the cost of memory that goes like \theta(n_estimators * n_train * n_samples)
+        lock = threading.Lock()
+        Parallel(n_jobs=self.n_jobs, verbose=self.verbose, require="sharedmem")(
+            delayed(self._weights_single_tree)(self.y_train_leaves_, self.y_weights_, j, x_tree, weights, lock)
+            for j, x_tree in enumerate(X_leaves.T)
+        )
+
+        for i in range(X.shape[0]):
             quantiles[i] = weighted_percentile(
-                self.y_train_, quantile, weights, sorter)
+                self.y_train_, quantile, weights[i, :], sorter
+            )
         return quantiles
 
 
