@@ -7,5 +7,8 @@ endif
 
 
 deps: venv
-	pip install -U pip
+	pip install -U pip setuptools~=59.0
 	pip install -Ue .
+
+test: venv
+	python setup.py test

@@ -1,7 +1,5 @@
 language: python
 
-
-
 notifications:
   email: false
 
@@ -13,7 +11,7 @@ env:
   matrix:
     - DISTRIB="conda" PYTHON_VERSION="3.6" COVERAGE="true"
 
-install: source build_tools/travis/install.sh
+install: make deps
 
 script:
-  nosetests
+  make test
