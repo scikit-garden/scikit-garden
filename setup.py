@@ -13,7 +13,7 @@ URL = 'https://github.com/scikit-garden/scikit-garden'
 MAINTAINER = 'Manoj Kumar'
 MAINTAINER_EMAIL = 'mks542@nyu.edu'
 LICENSE = 'new BSD'
-VERSION = '0.1.3'
+VERSION = '0.1.4'
 
 CYTHON_MIN_VERSION = '0.23'
 
@@ -73,5 +73,5 @@ if __name__ == "__main__":
               'Operating System :: MacOS'
             ],
           install_requires=["numpy", "scipy", "scikit-learn>=0.22", "cython", "six"],
-          setup_requires=["cython"],
+          setup_requires=["cython", "numpy"],
           ext_modules=extensions)
