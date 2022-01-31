@@ -1,22 +1,29 @@
-machine:
-  python:
-    version: 3.5.1
+version: 2.1
 
-dependencies:
-  override:
-    - bash ./build_tools/circle/install.sh:
+jobs:
+  deploy:
+    docker:
+      - image: circleci/python:3.7
+    environment:
+      - CIRCLE_ARTIFACTS: /tmp/circle_artifacts
+    steps:
+      - checkout
+      - run: mkdir -p $CIRCLE_ARTIFACTS
+      - run:
+          name: dependencies
+          command: bash ./build_tools/circle/install.sh
+      - run:
+          name: test
+          command: bash ./build_tools/circle/build.sh
+      - run:
+          name: deployment
+          command: bash ./build_tools/circle/deploy.sh
+      - store_artifacts:
+          # Open the doc to the API
+          path: ~/site
 
-test:
-  commands:
-    - bash ./build_tools/circle/build.sh
-
-deployment:
- push:
-   branch: master
-   commands:
-     - bash ./build_tools/circle/deploy.sh
-
-general:
-  # Open the doc to the API
-  artifacts:
-    - ~/site
+workflows:
+  version: 2
+  build-and-deploy:
+      jobs:
+      - deploy
