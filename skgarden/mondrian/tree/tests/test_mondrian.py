@@ -350,7 +350,7 @@ def test_weighted_decision_path_classif():
 
 def test_std_positive():
     """Sometimes variance can be slightly negative due to numerical errors."""
-    X = np.linspace(-np.pi, np.pi, 20.0)
+    X = np.linspace(-np.pi, np.pi, 20)
     y = 2*np.sin(X)
     X_train = np.reshape(X, (-1, 1))
     mr = MondrianTreeRegressor(random_state=0)
