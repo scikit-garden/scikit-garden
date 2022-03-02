@@ -128,8 +128,9 @@ cdef class TreeBuilder:
 cdef class PartialFitTreeBuilder(TreeBuilder):
     """Build a decision tree incrementally."""
 
-    def __cinit__(self, SIZE_t min_samples_split, SIZE_t max_depth,
-                  object random_state):
+    def __cinit__(self, Splitter splitter, SIZE_t min_samples_split,
+                  SIZE_t max_depth, object random_state):
+        self.splitter = splitter
         self.min_samples_split = min_samples_split
         self.max_depth = max_depth
         self.random_state = random_state

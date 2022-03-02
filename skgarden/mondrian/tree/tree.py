@@ -401,7 +401,7 @@ class BaseMondrianTree(BaseDecisionTree):
         """
         random_state = check_random_state(self.random_state)
         X, y = check_X_y(X, y, dtype=DTYPE, multi_output=False, order="C")
-        is_classifier = isinstance(self, ClassifierMixin)
+        is_classification = isinstance(self, ClassifierMixin)
         random_state = check_random_state(self.random_state)
         max_depth = ((2 ** 31) - 1 if self.max_depth is None
                      else self.max_depth)
@@ -412,7 +412,7 @@ class BaseMondrianTree(BaseDecisionTree):
         if not hasattr(self, "first_"):
             self.first_ = True
 
-        if is_classifier:
+        if is_classification:
             check_classification_targets(y)
 
             # First call to partial_fit
@@ -432,6 +432,7 @@ class BaseMondrianTree(BaseDecisionTree):
             n_classes = [1]
 
         # To be consistent with sklearns tree architecture, we reshape.
+        n_samples = X.shape[0]
         y = np.array(y, dtype=np.float64)
         y = np.reshape(y, (-1, 1))
 
@@ -442,8 +443,26 @@ class BaseMondrianTree(BaseDecisionTree):
             self.n_outputs_ = 1
             self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
 
-        builder = PartialFitTreeBuilder(
-            self.min_samples_split, max_depth, random_state)
+        # Initialize criterion and splitter instances.
+        criterion = self.criterion
+        if not isinstance(criterion, Criterion):
+            if is_classification:
+                criterion = CRITERIA_CLF[self.criterion](self.n_outputs_,
+                                                         self.n_classes_)
+            else:
+                criterion = CRITERIA_REG[self.criterion](self.n_outputs_,
+                                                         n_samples)
+        splitter = self.splitter
+        if not isinstance(self.splitter, Splitter):
+            splitter = SPLITTERS[self.splitter](criterion, random_state)
+
+        # First-call to partial_fit should be equivalent to fit.
+        if first_call:
+            builder = DepthFirstTreeBuilder(
+                splitter, self.min_samples_split, max_depth)
+        else:
+            builder = PartialFitTreeBuilder(
+                splitter, self.min_samples_split, max_depth, random_state)
         builder.build(self.tree_, X, y)
         return self
 
