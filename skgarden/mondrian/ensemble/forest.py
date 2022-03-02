@@ -1,4 +1,6 @@
 import numpy as np
+import warnings
+from warnings import warn
 from scipy import sparse
 from sklearn.base import ClassifierMixin
 from sklearn.exceptions import NotFittedError
@@ -145,11 +147,6 @@ class MondrianForestRegressor(ForestRegressor, BaseMondrian):
         Stop growing the tree if all the nodes have lesser than
         `min_samples_split` number of samples.
 
-    bootstrap : boolean, optional (default=False)
-        If bootstrap is set to False, then all trees are trained on the
-        entire training dataset. Else, each tree is fit on n_samples
-        drawn with replacement from the training dataset.
-
     random_state : int, RandomState instance or None, optional (default=None)
         If int, random_state is the seed used by the random number generator;
         If RandomState instance, random_state is the random number generator;
@@ -160,7 +157,7 @@ class MondrianForestRegressor(ForestRegressor, BaseMondrian):
                  n_estimators=10,
                  max_depth=None,
                  min_samples_split=2,
-                 bootstrap=False,
+                 bootstrap=None,
                  n_jobs=1,
                  random_state=None,
                  verbose=0):
@@ -201,6 +198,10 @@ class MondrianForestRegressor(ForestRegressor, BaseMondrian):
         self : object
             Returns self.
         """
+        if self.bootstrap is not None:
+            warn("The bootstrap argument will be removed in next version."
+                 "By default the value will be set to False.",
+                 DeprecationWarning, stacklevel=2)
         X, y = check_X_y(X, y, dtype=np.float32, multi_output=False)
         return super(MondrianForestRegressor, self).fit(X, y)
 
@@ -303,11 +304,6 @@ class MondrianForestClassifier(ForestClassifier, BaseMondrian):
         Stop growing the tree if all the nodes have lesser than
         `min_samples_split` number of samples.
 
-    bootstrap : boolean, optional (default=False)
-        If bootstrap is set to False, then all trees are trained on the
-        entire training dataset. Else, each tree is fit on n_samples
-        drawn with replacement from the training dataset.
-
     random_state : int, RandomState instance or None, optional (default=None)
         If int, random_state is the seed used by the random number generator;
         If RandomState instance, random_state is the random number generator;
@@ -318,7 +314,7 @@ class MondrianForestClassifier(ForestClassifier, BaseMondrian):
                  n_estimators=10,
                  max_depth=None,
                  min_samples_split=2,
-                 bootstrap=False,
+                 bootstrap=None,
                  n_jobs=1,
                  random_state=None,
                  verbose=0):
@@ -359,6 +355,10 @@ class MondrianForestClassifier(ForestClassifier, BaseMondrian):
         self : object
             Returns self.
         """
+        if self.bootstrap is not None:
+            warn("The bootstrap argument will be removed in next version."
+                 "By default the value will be set to False.",
+                 DeprecationWarning, stacklevel=2)
         X, y = check_X_y(X, y, dtype=np.float32, multi_output=False)
         return super(MondrianForestClassifier, self).fit(X, y)
 
