@@ -16,6 +16,8 @@ from numpy.testing import assert_equal
 from skgarden import MondrianForestClassifier
 from skgarden import MondrianForestRegressor
 
+train_test_split.__test__ = False
+
 boston = load_boston()
 # The time of split and feature chosen for splitting are highly
 # scale-sensitive.

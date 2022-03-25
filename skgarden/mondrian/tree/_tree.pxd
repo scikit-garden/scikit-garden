@@ -95,8 +95,36 @@ cdef class Tree:
                                   SIZE_t y_start=?)
     cdef void update_node_extent(self, SIZE_t node_ind, SIZE_t child_ind,
                                  DTYPE_t* X_ptr, SIZE_t X_start, SIZE_t X_f_stride)
+
     cdef void _update_node_info(self, SIZE_t parent_id, SIZE_t child_id,
                                 DOUBLE_t* y_ptr, SIZE_t y_start)
+
+# Serialize a tree and send it to the task with rank dst in the given MPI communicator.
+#   compression: an integer in [0, 9] indicating the level of compression to perform on the
+#                serialized data before sending. 0 indicates no compression, 9 indicates the highest
+#                level of compression. A higher compression level requires more computational
+#                overhead before sending, but results in less data being sent. Raises ValueError if
+#                compression is not in the range [0, 9].
+#   profile:     if True, the return value is a tuple
+#                (absolute start time, aboslute time sent, bytes sent). Else, the return value is
+#                None.
+cpdef object mpi_send_tree(object comm, int dst, Tree tree, int compression, bint profile, bint send_to_all)
+
+# Receive, decompress, and deserialize a tree sent by the task with rank src in the given MPI
+# communictor. The tree must have been sent via mpi_send_tree(), or else the behavior is undefined.
+#
+#   compression: an integer in [0, 9] indicating the level of compression to perform on the
+#                serialized data before sending. 0 indicates no compression, 9 indicates the highest
+#                level of compression. A higher compression level requires more computational
+#                overhead before sending, but results in less data being sent. Raises ValueError if
+#                compression is not in the range [0, 9].
+#   profile:     if True, the return value is a tuple
+#                (Tree, aboslute time received, absolute time finished). Else, the return value is
+#                simply the received tree.
+cpdef object mpi_recv_tree(object comm, int src,
+                           int n_features, np.ndarray[SIZE_t, ndim=1] n_classes, int n_outputs,
+                           bint profile)
+
 # =============================================================================
 # Tree builder
 # =============================================================================

@@ -29,6 +29,8 @@ import numpy as np
 cimport numpy as np
 np.import_array()
 
+import time
+
 from scipy.sparse import csr_matrix
 
 from ._utils cimport Stack
@@ -45,6 +47,17 @@ cdef extern from "numpy/arrayobject.h":
                                 int nd, np.npy_intp* dims,
                                 np.npy_intp* strides,
                                 void* data, int flags, object obj)
+
+cdef extern from "zlib.h":
+    ctypedef unsigned char Bytef
+    ctypedef unsigned long uLongf
+    ctypedef long unsigned uLong
+
+    int Z_OK
+
+    int compressBound(uLong)
+    int compress2(Bytef *, uLongf *, Bytef *, uLong, int)
+    int uncompress(Bytef *, uLongf *, const Bytef *, uLong);
 
 # =============================================================================
 # Types and constants
@@ -92,6 +105,50 @@ cdef inline double fmax(double left, double right) nogil:
 
 cdef inline double fmin(double left, double right) nogil:
     return left if left < right else right
+
+cdef object pickle_node(Tree tree, Node node):
+    d = {}
+    d['left_child']                 = node.left_child
+    d['right_child']                = node.right_child
+    d['feature']                    = node.feature
+    d['threshold']                  = node.threshold
+    d['impurity']                   = node.impurity
+    d['n_node_samples']             = node.n_node_samples
+    d['weighted_n_node_samples']    = node.weighted_n_node_samples
+    d['tau']                        = node.tau
+    d['variance']                   = node.variance
+
+    cdef np.npy_intp bounds_shape[1]
+    bounds_shape[0] = <np.npy_intp>tree.n_features
+    d['lower_bounds']               = np.PyArray_SimpleNewFromData(
+                                        1, bounds_shape, np.NPY_FLOAT, node.lower_bounds)
+    d['upper_bounds']               = np.PyArray_SimpleNewFromData(
+                                        1, bounds_shape, np.NPY_FLOAT, node.upper_bounds)
+
+    return d
+
+cdef Node unpickle_node(Tree tree, object d):
+    cdef Node node
+    node.left_child                 = d['left_child']
+    node.right_child                = d['right_child']
+    node.feature                    = d['feature']
+    node.threshold                  = d['threshold']
+    node.impurity                   = d['impurity']
+    node.n_node_samples             = d['n_node_samples']
+    node.weighted_n_node_samples    = d['weighted_n_node_samples']
+    node.lower_bounds               = <DTYPE_t *>malloc(tree.n_features*sizeof(DTYPE_t))
+    node.upper_bounds               = <DTYPE_t *>malloc(tree.n_features*sizeof(DTYPE_t))
+    node.tau                        = d['tau']
+    node.variance                   = d['variance']
+
+    cdef np.ndarray[DTYPE_t, ndim=1, mode="c"] lower_bounds_array = \
+        np.asarray(d['lower_bounds'], order="C")
+    cdef np.ndarray[DTYPE_t, ndim=1, mode="c"] upper_bounds_array = \
+        np.asarray(d['upper_bounds'], order="C")
+    memcpy(node.lower_bounds, <DTYPE_t *>&lower_bounds_array[0], tree.n_features*sizeof(DTYPE_t))
+    memcpy(node.upper_bounds, <DTYPE_t *>&upper_bounds_array[0], tree.n_features*sizeof(DTYPE_t))
+
+    return node
 
 
 # =============================================================================
@@ -451,6 +508,9 @@ cdef class Tree:
     def __dealloc__(self):
         """Destructor."""
         # Free all inner structures
+        for i in range(self.node_count):
+            free(self.nodes[i].lower_bounds)
+            free(self.nodes[i].upper_bounds)
         free(self.n_classes)
         free(self.value)
         free(self.nodes)
@@ -467,7 +527,9 @@ cdef class Tree:
         # capacity is infered during the __setstate__ using nodes
         d["max_depth"] = self.max_depth
         d["node_count"] = self.node_count
-        d["nodes"] = self._get_node_ndarray()
+        d["nodes"] = []
+        for i in range(self.node_count):
+            d["nodes"].append(pickle_node(self, self.nodes[i]))
         d["values"] = self._get_value_ndarray()
         d["root"] = self.root
         return d
@@ -482,24 +544,16 @@ cdef class Tree:
             raise ValueError('You have loaded Tree version which '
                              'cannot be imported')
 
-        node_ndarray = d['nodes']
-        value_ndarray = d['values']
-
-        value_shape = (node_ndarray.shape[0], self.n_outputs,
-                       self.max_n_classes)
-        if (node_ndarray.ndim != 1 or
-                node_ndarray.dtype != NODE_DTYPE or
-                not node_ndarray.flags.c_contiguous or
-                value_ndarray.shape != value_shape or
-                not value_ndarray.flags.c_contiguous or
-                value_ndarray.dtype != np.float64):
-            raise ValueError('Did not recognise loaded array layout')
-
-        self.capacity = node_ndarray.shape[0]
+        nodes = d['nodes']
+        self.capacity = len(nodes)
         if self._resize_c(self.capacity) != 0:
             raise MemoryError("resizing tree to %d" % self.capacity)
-        nodes = memcpy(self.nodes, (<np.ndarray> node_ndarray).data,
-                       self.capacity * sizeof(Node))
+        for i, node in enumerate(nodes):
+            self.nodes[i] = unpickle_node(self, node)
+
+        value_ndarray = d['values']
+        value_shape = (self.capacity, self.n_outputs,
+                       self.max_n_classes)
         value = memcpy(self.value, (<np.ndarray> value_ndarray).data,
                        self.capacity * self.value_stride * sizeof(double))
 
@@ -1238,3 +1292,199 @@ cdef class Tree:
         Py_INCREF(self)
         arr.base = <PyObject*> self
         return arr
+
+cdef SIZE_t mpi_tree_node_buf_size(Tree tree):
+    return (
+        sizeof((<Node *>NULL).left_child) +
+        sizeof((<Node *>NULL).right_child) +
+        sizeof((<Node *>NULL).feature) +
+        sizeof((<Node *>NULL).threshold) +
+        sizeof((<Node *>NULL).impurity) +
+        sizeof((<Node *>NULL).n_node_samples) +
+        sizeof((<Node *>NULL).weighted_n_node_samples) +
+        sizeof((<Node *>NULL).tau) +
+        sizeof((<Node *>NULL).variance) +
+        sizeof((<Node *>NULL).lower_bounds[0]) * tree.n_features +
+        sizeof((<Node *>NULL).upper_bounds[0]) * tree.n_features
+    )
+
+cdef SIZE_t mpi_tree_value_buf_size(Tree tree):
+    return sizeof(tree.value[0]) * tree.node_count*tree.n_outputs*tree.max_n_classes
+
+cdef SIZE_t mpi_tree_buf_size(Tree tree):
+    return mpi_tree_node_buf_size(tree)*tree.node_count + mpi_tree_value_buf_size(tree)
+
+cdef struct MPITreeHeader:
+    SIZE_t node_count
+    SIZE_t compressed_buf_size
+
+cdef void mpi_send_tree_header(object comm, int dst, MPITreeHeader h):
+    cdef np.npy_intp dim = sizeof(h)
+    cdef np.ndarray arr = np.PyArray_SimpleNewFromData(1, &dim, np.NPY_BYTE, &h)
+    comm.Send(arr, dst)
+
+cdef MPITreeHeader mpi_recv_tree_header(object comm, int src):
+    cdef MPITreeHeader h
+    cdef np.npy_intp dim = sizeof(h)
+    cdef np.ndarray arr = np.PyArray_SimpleNewFromData(1, &dim, np.NPY_BYTE, &h)
+    comm.Recv(arr, source=src)
+    return h
+
+cpdef object mpi_send_tree(object comm, int dst, Tree tree, int compression, bint profile, bint send_to_all):
+    if compression < 0 or compression > 9:
+        raise ValueError('compression must be in [0, 9] (got {})'.format(int(compression)))
+
+    if profile:
+        t_start = time.time()
+
+    cdef np.ndarray buf = np.empty(mpi_tree_buf_size(tree), dtype=np.dtype('b'))
+
+    cdef char *cursor = <char *>buf.data
+
+    cdef Node *node
+    for i in range(tree.node_count):
+        node = &tree.nodes[i]
+
+        memcpy(cursor, &node.left_child, sizeof(node.left_child))
+        cursor += sizeof(node.left_child)
+
+        memcpy(cursor, &node.right_child, sizeof(node.right_child))
+        cursor += sizeof(node.right_child)
+
+        memcpy(cursor, &node.feature, sizeof(node.feature))
+        cursor += sizeof(node.feature)
+
+        memcpy(cursor, &node.threshold, sizeof(node.threshold))
+        cursor += sizeof(node.threshold)
+
+        memcpy(cursor, &node.impurity, sizeof(node.impurity))
+        cursor += sizeof(node.impurity)
+
+        memcpy(cursor, &node.n_node_samples, sizeof(node.n_node_samples))
+        cursor += sizeof(node.n_node_samples)
+
+        memcpy(cursor, &node.weighted_n_node_samples, sizeof(node.weighted_n_node_samples))
+        cursor += sizeof(node.weighted_n_node_samples)
+
+        memcpy(cursor, &node.tau, sizeof(node.tau))
+        cursor += sizeof(node.tau)
+
+        memcpy(cursor, &node.variance, sizeof(node.variance))
+        cursor += sizeof(node.variance)
+
+        memcpy(cursor, node.lower_bounds, sizeof(node.lower_bounds[0])*tree.n_features)
+        cursor += sizeof(node.lower_bounds[0])*tree.n_features
+
+        memcpy(cursor, node.upper_bounds, sizeof(node.upper_bounds[0])*tree.n_features)
+        cursor += sizeof(node.upper_bounds[0])*tree.n_features
+
+    memcpy(cursor, tree.value, mpi_tree_value_buf_size(tree))
+
+    cdef uLongf buf_size = buf.shape[0]
+    cdef uLongf compressed_buf_size = compressBound(buf_size)
+    cdef np.ndarray compressed_buf = np.empty(compressed_buf_size, dtype=np.dtype('b'))
+
+    cdef int err = compress2(<Bytef *>compressed_buf.data, &compressed_buf_size,
+                             <const Bytef *>buf.data, buf_size, compression)
+    if err != Z_OK:
+        raise RuntimeError('zlib error on compress2: {}'.format(int(err)))
+    compressed_buf.resize(compressed_buf_size)
+
+    cdef MPITreeHeader h
+    h.node_count = tree.node_count
+    h.compressed_buf_size = compressed_buf_size
+
+    if profile:
+        sent_bytes = sizeof(h) + compressed_buf_size
+        t_sent = time.time()
+    if send_to_all:
+        for dst in range(comm.size):
+            if dst != comm.rank:
+                mpi_send_tree_header(comm, dst, h)
+                comm.Send(compressed_buf, dst)
+    else:
+        mpi_send_tree_header(comm, dst, h)
+        comm.Send(compressed_buf, dst)
+
+    if profile:
+        return (t_start, t_sent, sent_bytes)
+    else:
+        return None
+
+cpdef object mpi_recv_tree(object comm, int src,
+                           int n_features, np.ndarray[SIZE_t, ndim=1] n_classes, int n_outputs,
+                           bint profile):
+    tree = Tree(n_features, n_classes, n_outputs)
+
+    # Get the header and resize the tree based on the node count
+    cdef MPITreeHeader h = mpi_recv_tree_header(comm, src)
+    tree._resize(h.node_count)
+    tree.node_count = h.node_count
+
+    # Get the data buffer
+    cdef np.ndarray compressed_buf = np.empty(h.compressed_buf_size, dtype=np.dtype('b'))
+    comm.Recv(compressed_buf, source=src)
+
+    if profile:
+        t_recv = time.time()
+
+    # Unzip the buffer
+    cdef uLongf buf_size = mpi_tree_buf_size(tree)
+    cdef uLongf expected_buf_size = buf_size
+    cdef np.ndarray buf = np.empty(buf_size, dtype=np.dtype('b'))
+    cdef int err = uncompress(
+        <Bytef *>buf.data, &buf_size, <const Bytef *>compressed_buf.data, h.compressed_buf_size)
+    if err != Z_OK:
+        raise RuntimeError('zlib error on uncompress: {}'.format(int(err)))
+    if buf_size != expected_buf_size:
+        raise RuntimeError('unexpected buf_size! expected {}, got {}'.format(
+            int(expected_buf_size), int(buf_size)))
+
+    cdef char *cursor = <char *>buf.data
+
+    cdef Node *node
+    for i in range(tree.node_count):
+        node = &tree.nodes[i]
+        node.lower_bounds = <DTYPE_t *>malloc(sizeof(DTYPE_t)*tree.n_features)
+        node.upper_bounds = <DTYPE_t *>malloc(sizeof(DTYPE_t)*tree.n_features)
+
+        memcpy(&node.left_child, cursor, sizeof(node.left_child))
+        cursor += sizeof(node.left_child)
+
+        memcpy(&node.right_child, cursor, sizeof(node.right_child))
+        cursor += sizeof(node.right_child)
+
+        memcpy(&node.feature, cursor, sizeof(node.feature))
+        cursor += sizeof(node.feature)
+
+        memcpy(&node.threshold, cursor, sizeof(node.threshold))
+        cursor += sizeof(node.threshold)
+
+        memcpy(&node.impurity, cursor, sizeof(node.impurity))
+        cursor += sizeof(node.impurity)
+
+        memcpy(&node.n_node_samples, cursor, sizeof(node.n_node_samples))
+        cursor += sizeof(node.n_node_samples)
+
+        memcpy(&node.weighted_n_node_samples, cursor, sizeof(node.weighted_n_node_samples))
+        cursor += sizeof(node.weighted_n_node_samples)
+
+        memcpy(&node.tau, cursor, sizeof(node.tau))
+        cursor += sizeof(node.tau)
+
+        memcpy(&node.variance, cursor, sizeof(node.variance))
+        cursor += sizeof(node.variance)
+
+        memcpy(node.lower_bounds, cursor, sizeof(node.lower_bounds[0])*tree.n_features)
+        cursor += sizeof(node.lower_bounds[0])*tree.n_features
+
+        memcpy(node.upper_bounds, cursor, sizeof(node.upper_bounds[0])*tree.n_features)
+        cursor += sizeof(node.upper_bounds[0])*tree.n_features
+
+    memcpy(tree.value, cursor, mpi_tree_value_buf_size(tree))
+
+    if profile:
+        t_end = time.time()
+        return tree, t_recv, t_end
+    else:
+        return tree

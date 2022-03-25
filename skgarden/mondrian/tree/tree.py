@@ -506,6 +506,46 @@ class MondrianTreeRegressor(BaseMondrianTree, RegressorMixin):
         """
         return super(MondrianTreeRegressor, self).partial_fit(X, y)
 
+# Serialize a tree and send it to the task with rank dst in the given MPI communicator.
+#   compression: an integer in [0, 9] indicating the level of compression to perform on the
+#                serialized data before sending. 0 indicates no compression, 9 indicates the highest
+#                level of compression. A higher compression level requires more computational
+#                overhead before sending, but results in less data being sent. Raises ValueError if
+#                compression is not in the range [0, 9].
+#   profile:     if True, the return value is a tuple
+#                (absolute start time, aboslute time sent, bytes sent). Else, the return value is
+#                None.
+def mpi_send(comm, dst, tree, compression=1, profile=False, send_to_all=False):
+    return _tree.mpi_send_tree(comm, dst, tree.tree_, compression, profile, send_to_all)
+
+# Receive, decompress, and deserialize a tree sent by the task with rank src in the given MPI
+# communictor. The tree must have been sent via mpi_send_tree(), or else the behavior is undefined.
+#
+#   compression: an integer in [0, 9] indicating the level of compression to perform on the
+#                serialized data before sending. 0 indicates no compression, 9 indicates the highest
+#                level of compression. A higher compression level requires more computational
+#                overhead before sending, but results in less data being sent. Raises ValueError if
+#                compression is not in the range [0, 9].
+#   profile:     if True, the return value is a tuple
+#                (Tree, aboslute time received, absolute time finished). Else, the return value is
+#                simply the received tree.
+def mpi_recv_regressor(comm, src, n_features, n_outputs, profile=False):
+    tree = MondrianTreeRegressor()
+    tree.n_features_ = n_features
+    tree.classes_ = [None]*n_outputs
+    tree.n_classes_ = [1]*n_outputs
+    tree.n_outputs_ = n_outputs
+    res = _tree.mpi_recv_tree(
+        comm, src, tree.n_features_, np.array(tree.n_classes_), tree.n_outputs_, profile)
+
+    if profile:
+        tree_, t_recv, t_end = res
+        tree.tree_ = tree_
+        return tree, t_recv, t_end
+    else:
+        tree.tree_ = res
+        return tree
+
 class MondrianTreeClassifier(BaseMondrianTree, ClassifierMixin):
     def __init__(self,
                  max_depth=None,
