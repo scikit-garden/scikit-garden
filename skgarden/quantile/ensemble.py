@@ -1,4 +1,3 @@
-from __future__ import division
 import numpy as np
 from numpy import ma
 from sklearn.ensemble import ExtraTreesRegressor
@@ -76,8 +75,11 @@ class BaseForestQuantileRegressor(ForestRegressor):
             Returns self.
         """
         # apply method requires X to be of dtype np.float32
+        multi_output = False
+        if len(y.shape) == 2 and y.shape[1] > 1:
+            multi_output = True
         X, y = check_X_y(
-            X, y, accept_sparse="csc", dtype=np.float32, multi_output=False)
+            X, y, accept_sparse="csc", dtype=np.float32, multi_output=multi_output)
         super(BaseForestQuantileRegressor, self).fit(X, y)
 
         self.y_train_ = y
@@ -130,16 +132,29 @@ class BaseForestQuantileRegressor(ForestRegressor):
         if quantile is None:
             return super(BaseForestQuantileRegressor, self).predict(X)
 
-        sorter = np.argsort(self.y_train_)
+        if self.n_outputs_ > 1:
+            sorter = np.argsort(self.y_train_, axis=0)
+        else:
+            sorter = np.argsort(self.y_train_)
         X_leaves = self.apply(X)
         weights = np.zeros((X.shape[0], len(self.y_train_)))
-        quantiles = np.zeros((X.shape[0]))
+        if self.n_outputs_ > 1:
+            quantiles = np.zeros((X.shape[0], self.n_outputs_))
+        else:
+            quantiles = np.zeros(X.shape[0])
         for i, x_leaf in enumerate(X_leaves):
             mask = self.y_train_leaves_ != np.expand_dims(x_leaf, 1)
             x_weights = ma.masked_array(self.y_weights_, mask)
+            x_weights0 = self.y_weights_*mask
             weights = x_weights.sum(axis=0)
-            quantiles[i] = weighted_percentile(
-                self.y_train_, quantile, weights, sorter)
+            if self.n_outputs_ > 1:
+                for j in range(self.n_outputs_):
+                    quantiles[i,j] = weighted_percentile(
+                    self.y_train_[:, j], quantile, weights, sorter[:, j])
+            else:
+                quantiles[i] = weighted_percentile(
+                    self.y_train_, quantile, weights, sorter)
+
         return quantiles
 
 
@@ -482,3 +497,4 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
         self.min_weight_fraction_leaf = min_weight_fraction_leaf
         self.max_features = max_features
         self.max_leaf_nodes = max_leaf_nodes
+
