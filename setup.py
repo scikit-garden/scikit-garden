@@ -47,6 +47,13 @@ for name in ['_tree', '_splitter', '_criterion', '_utils']:
     ))
 extensions = cythonize(extensions)
 
+requirements = [
+    "numpy", 
+    "scipy", 
+    "scikit-learn~=1.1.2", 
+    "cython", 
+    "six"
+    ]
 
 if __name__ == "__main__":
     setup(name=DISTNAME,
@@ -72,6 +79,6 @@ if __name__ == "__main__":
               'Operating System :: Unix',
               'Operating System :: MacOS'
             ],
-          install_requires=["numpy", "scipy", "scikit-learn>=0.22", "cython", "six"],
+          install_requires=requirements,
           setup_requires=["cython", "numpy"],
           ext_modules=extensions)
