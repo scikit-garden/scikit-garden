@@ -1182,21 +1182,24 @@ class ForestRegressor(RegressorMixin, BaseForest, metaclass=ABCMeta):
 
         
     def _joblib_parallel_args(**kwargs):
-    """Set joblib.Parallel arguments in a compatible way for 0.11 and 0.12+
-    For joblib 0.11 this maps both ``prefer`` and ``require`` parameters to
-    a specific ``backend``.
-    Parameters
-    ----------
-    prefer : str in {'processes', 'threads'} or None
-        Soft hint to choose the default backend if no specific backend
-        was selected with the parallel_backend context manager.
-    require : 'sharedmem' or None
-        Hard condstraint to select the backend. If set to 'sharedmem',
-        the selected backend will be single-host and thread-based even
-        if the user asked for a non-thread based backend with
-        parallel_backend.
-    See joblib.Parallel documentation for more details
-    """
+        """
+        Copied from an old sklearn version
+        
+        Set joblib.Parallel arguments in a compatible way for 0.11 and 0.12+
+        For joblib 0.11 this maps both ``prefer`` and ``require`` parameters to
+        a specific ``backend``.
+        Parameters
+        ----------
+        prefer : str in {'processes', 'threads'} or None
+            Soft hint to choose the default backend if no specific backend
+            was selected with the parallel_backend context manager.
+        require : 'sharedmem' or None
+            Hard condstraint to select the backend. If set to 'sharedmem',
+            the selected backend will be single-host and thread-based even
+            if the user asked for a non-thread based backend with
+            parallel_backend.
+        See joblib.Parallel documentation for more details
+        """
 
         if _joblib.__version__ >= LooseVersion('0.12'):
             return kwargs
