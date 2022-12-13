@@ -16,7 +16,7 @@ from sklearn.metrics import r2_score
 from sklearn.utils import check_random_state
 from sklearn.utils import check_array
 from sklearn.utils import compute_sample_weight
-from sklearn.utils.fixes import _joblib_parallel_args
+#from sklearn.utils.fixes import _joblib_parallel_args
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.validation import _check_sample_weight
@@ -1030,6 +1030,9 @@ class ForestClassifier(ClassifierMixin, BaseForest, metaclass=ABCMeta):
         else:
             return all_proba
 
+   
+        
+        
     def predict_log_proba(self, X):
         """
         Predict class log-probabilities for X.
@@ -1176,3 +1179,46 @@ class ForestRegressor(RegressorMixin, BaseForest, metaclass=ABCMeta):
                                         predictions[:, k])
 
         self.oob_score_ /= self.n_outputs_
+
+        
+    def _joblib_parallel_args(**kwargs):
+    """Set joblib.Parallel arguments in a compatible way for 0.11 and 0.12+
+    For joblib 0.11 this maps both ``prefer`` and ``require`` parameters to
+    a specific ``backend``.
+    Parameters
+    ----------
+    prefer : str in {'processes', 'threads'} or None
+        Soft hint to choose the default backend if no specific backend
+        was selected with the parallel_backend context manager.
+    require : 'sharedmem' or None
+        Hard condstraint to select the backend. If set to 'sharedmem',
+        the selected backend will be single-host and thread-based even
+        if the user asked for a non-thread based backend with
+        parallel_backend.
+    See joblib.Parallel documentation for more details
+    """
+
+        if _joblib.__version__ >= LooseVersion('0.12'):
+            return kwargs
+
+        extra_args = set(kwargs.keys()).difference({'prefer', 'require'})
+        if extra_args:
+            raise NotImplementedError('unhandled arguments %s with joblib %s'
+                                  % (list(extra_args), _joblib.__version__))
+        args = {}
+        if 'prefer' in kwargs:
+            prefer = kwargs['prefer']
+            if prefer not in ['threads', 'processes', None]:
+                raise ValueError('prefer=%s is not supported' % prefer)
+            args['backend'] = {'threads': 'threading',
+                               'processes': 'multiprocessing',
+                               None: None}[prefer]
+
+        if 'require' in kwargs:
+            require = kwargs['require']
+            if require not in [None, 'sharedmem']:
+                raise ValueError('require=%s is not supported' % require)
+            if require == 'sharedmem':
+                args['backend'] = 'threading'
+        return args
+    
