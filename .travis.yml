@@ -3,6 +3,11 @@ python:
   - "3.6"
   - "3.9"
 
+jobs:
+  allow_failures:
+    - python: 3.6
+  fast_finish: true
+
 notifications:
   email: false
 
