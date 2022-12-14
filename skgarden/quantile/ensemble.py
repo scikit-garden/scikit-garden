@@ -11,7 +11,7 @@ from joblib import delayed, Parallel
 
 
 from ..forest import ForestRegressor
-from ..utils.helpers
+from ..utils.helpers import _joblib_parallel_args
 
 from .tree import DecisionTreeQuantileRegressor
 from .tree import ExtraTreeQuantileRegressor
