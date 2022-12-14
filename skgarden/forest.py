@@ -35,7 +35,7 @@ import threading
 
 from warnings import warn
 
-from .utils.helpers import _joblib_parallel_args
+from skgarden.utils.helpers import _joblib_parallel_args
 
 MAX_INT = np.iinfo(np.int32).max
 
