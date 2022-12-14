@@ -17,6 +17,7 @@ def _joblib_parallel_args(**kwargs):
             parallel_backend.
         See joblib.Parallel documentation for more details
         """
+        from . import _joblib
 
         if _joblib.__version__ >= LooseVersion('0.12'):
             return kwargs
