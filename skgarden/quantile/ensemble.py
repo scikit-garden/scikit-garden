@@ -9,6 +9,7 @@ from sklearn.utils import check_random_state
 from sklearn.utils import check_X_y
 from joblib import delayed, Parallel
 
+from helpers import _joblib_parallel_args
 
 from ..forest import ForestRegressor
 
