@@ -66,12 +66,6 @@ class BaseForestQuantileRegressor(ForestRegressor):
             Allow to bypass several input checking.
             Don't use this parameter unless you know what you do.
 
-        X_idx_sorted : array-like, shape = [n_samples, n_features], optional
-            The indexes of the sorted training input samples. If many tree
-            are grown on the same dataset, this allows the ordering to be
-            cached between trees. If None, the data will be sorted here.
-            Don't use this parameter unless you know what to do.
-
         Returns
         -------
         self : object
