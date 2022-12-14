@@ -16,7 +16,6 @@ from sklearn.metrics import r2_score
 from sklearn.utils import check_random_state
 from sklearn.utils import check_array
 from sklearn.utils import compute_sample_weight
-#from sklearn.utils.fixes import _joblib_parallel_args
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.validation import _check_sample_weight
@@ -36,7 +35,7 @@ import threading
 
 from warnings import warn
 
-from helpers import _joblib_parallel_args
+from .helpers import _joblib_parallel_args
 
 
 MAX_INT = np.iinfo(np.int32).max
