@@ -37,7 +37,6 @@ from warnings import warn
 
 from .helpers import _joblib_parallel_args
 
-
 MAX_INT = np.iinfo(np.int32).max
 
 def _generate_sample_indices(random_state, n_samples, n_samples_bootstrap):
@@ -1029,10 +1028,7 @@ class ForestClassifier(ClassifierMixin, BaseForest, metaclass=ABCMeta):
         if len(all_proba) == 1:
             return all_proba[0]
         else:
-            return all_proba
-
-   
-        
+            return all_proba   
         
     def predict_log_proba(self, X):
         """
