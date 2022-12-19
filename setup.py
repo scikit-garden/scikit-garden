@@ -62,6 +62,7 @@ if __name__ == "__main__":
           packages=find_packages(),
           include_package_data=True,
           description=DESCRIPTION,
+          classifiers=['Programming Language :: Python :: 3.9'],
           license=LICENSE,
           url=URL,
           version=VERSION,
