@@ -1,12 +1,6 @@
 language: python
 python:
-  - "3.6"
   - "3.9"
-
-jobs:
-  allow_failures:
-    - python: 3.6
-  fast_finish: true
 
 notifications:
   email: false
@@ -17,7 +11,7 @@ cache:
 
 env:
   matrix:
-    - DISTRIB="conda" PYTHON_VERSION="3.6" COVERAGE="true"
+    - DISTRIB="conda" PYTHON_VERSION="3.9" COVERAGE="true"
 
 install: make deps
 
