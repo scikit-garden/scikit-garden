@@ -9,7 +9,6 @@ from sklearn.utils import check_random_state
 from sklearn.utils import check_X_y
 from joblib import delayed, Parallel
 
-
 from ..forest import ForestRegressor
 
 from .tree import DecisionTreeQuantileRegressor
@@ -66,12 +65,6 @@ class BaseForestQuantileRegressor(ForestRegressor):
         check_input : boolean, (default=True)
             Allow to bypass several input checking.
             Don't use this parameter unless you know what you do.
-
-        X_idx_sorted : array-like, shape = [n_samples, n_features], optional
-            The indexes of the sorted training input samples. If many tree
-            are grown on the same dataset, this allows the ordering to be
-            cached between trees. If None, the data will be sorted here.
-            Don't use this parameter unless you know what to do.
 
         Returns
         -------

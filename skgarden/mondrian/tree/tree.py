@@ -91,8 +91,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         self.random_state = random_state
         self.class_weight = class_weight
 
-    def fit(self, X, y, sample_weight=None, check_input=True,
-            X_idx_sorted=None):
+    def fit(self, X, y, sample_weight=None, check_input=True):
         random_state = check_random_state(self.random_state)
         if check_input:
             X, y = check_X_y(X, y, dtype=DTYPE, multi_output=False)
@@ -204,7 +203,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator)):
         self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
         builder = DepthFirstTreeBuilder(splitter, min_samples_split,
                                         max_depth)
-        builder.build(self.tree_, X, y, sample_weight, X_idx_sorted)
+        builder.build(self.tree_, X, y, sample_weight)
 
         if self.n_outputs_ == 1:
             self.n_classes_ = self.n_classes_[0]
