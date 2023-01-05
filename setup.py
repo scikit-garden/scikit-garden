@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 import os
+import sys
 
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
@@ -49,10 +50,22 @@ class CustomBuildExtCommand(build_ext):
 requirements = [
     "numpy", 
     "scipy", 
-    "scikit-learn~=1.1.2", 
     "cython", 
     "six"
     ]
+
+py36_requirements = [
+    'scikit-learn~=0.20.3'
+]
+
+py39_requirements = [
+    'scikit-learn~=1.1.2'
+]
+
+if sys.version_info[0] == 3 and sys.version_info[1] == 6:
+    requirements += py36_requirements
+else:
+    requirements += py39_requirements
 
 if __name__ == "__main__":
     setup(name=DISTNAME,
@@ -71,6 +84,7 @@ if __name__ == "__main__":
               'Intended Audience :: Developers',
               'License :: OSI Approved',
               'Programming Language :: C',
+              'Programming Language :: Python :: 3.6',
               'Programming Language :: Python :: 3.9',
               'Topic :: Software Development',
               'Topic :: Scientific/Engineering',
