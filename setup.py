@@ -46,11 +46,12 @@ class CustomBuildExtCommand(build_ext):
             self.distribution.ext_modules[:] = cythonize(self.distribution.ext_modules, force=self.force)
         super().finalize_options()
 
+
 requirements = [
     "numpy", 
     "scipy", 
     "scikit-learn~=1.1.2", 
-    "cython~=0.29.36",
+    "cython~=0.23",
     "six"
     ]
 
@@ -80,5 +81,5 @@ if __name__ == "__main__":
               'Operating System :: MacOS'
             ],
           install_requires=requirements,
-          setup_requires=["Cython>=0.23", "numpy", "setuptools>=18"],
+          setup_requires=["Cython~=0.23", "numpy", "setuptools>=18"],
           ext_modules=extensions)
