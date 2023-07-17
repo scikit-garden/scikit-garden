@@ -81,5 +81,5 @@ if __name__ == "__main__":
               'Operating System :: MacOS'
             ],
           install_requires=requirements,
-          setup_requires=["Cython~=0.23", "numpy", "setuptools>=18"],
+          setup_requires=["Cython>=0.23,<3.0", "numpy", "setuptools>=18"],
           ext_modules=extensions)
