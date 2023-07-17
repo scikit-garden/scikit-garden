@@ -12,7 +12,7 @@ URL = 'https://github.com/scikit-garden/scikit-garden'
 MAINTAINER = 'Manoj Kumar'
 MAINTAINER_EMAIL = 'mks542@nyu.edu'
 LICENSE = 'new BSD'
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 
 libraries = []
 if os.name == 'posix':
@@ -50,7 +50,7 @@ requirements = [
     "numpy", 
     "scipy", 
     "scikit-learn~=1.1.2", 
-    "cython", 
+    "cython~=0.29.36",
     "six"
     ]
 
