@@ -51,7 +51,7 @@ requirements = [
     "numpy", 
     "scipy", 
     "scikit-learn~=1.1.2", 
-    "cython~=0.23",
+    "cython>=0.23,<3.0",
     "six"
     ]
 
