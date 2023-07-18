@@ -48,10 +48,10 @@ class CustomBuildExtCommand(build_ext):
 
 
 requirements = [
-    "numpy<=1.23.5",
-    "scipy~=1.10.0",
+    "numpy",
+    "scipy",
     "scikit-learn~=1.1.2", 
-    "cython>=0.23,<3.0",
+    "cython<3.0",
     "six"
     ]
 
@@ -81,5 +81,5 @@ if __name__ == "__main__":
               'Operating System :: MacOS'
             ],
           install_requires=requirements,
-          setup_requires=["Cython>=0.23,<3.0", "numpy<=1.23.5", "setuptools>=18"],
+          setup_requires=["Cythonn>=0.23,<3.0", "numpy", "setuptools>=18"],
           ext_modules=extensions)
